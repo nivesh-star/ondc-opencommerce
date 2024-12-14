@@ -4,8 +4,8 @@ http_archive(
     name = "io_bazel_rules_go",
     sha256 = "6dc2da7ab4cf5d7bfc7c949776b1b7c733f05e56edc4bcd9022bb249d2e2a996",
     urls = [
-        "https://mirror.bazel.build/github.com/bazelbuild/rules_go/releases/download/v0.39.1/rules_go-v0.39.1.zip",
-        "https://github.com/bazelbuild/rules_go/releases/download/v0.39.1/rules_go-v0.39.1.zip",
+        "https://mirror.bazel.build/github.com/bazelbuild/rules_go/releases/download/v0.41.0/rules_go-v0.41.0.zip",
+        "https://github.com/bazelbuild/rules_go/releases/download/v0.41.0/rules_go-v0.41.0.zip",
     ],
 )
 
@@ -19,8 +19,43 @@ http_archive(
 )
 
 load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_dependencies")
-load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies")
+load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
 load("//:deps.bzl", "go_dependencies", "go_repositories")
+
+go_repository(
+    name = "com_github_aws_aws_sdk_go_v2",
+    importpath = "github.com/aws/aws-sdk-go-v2",
+    sum = "h1:7BokKRgRPuGmKkFMhEg/jSul+tB9VvXhcViILtfG8b4=",
+    version = "v1.32.6",
+)
+
+go_repository(
+    name = "com_github_aws_aws_sdk_go_v2_internal_configsources",
+    importpath = "github.com/aws/aws-sdk-go-v2/internal/configsources",
+    sum = "h1:s/fF4+yDQDoElYhfIVvSNyeCydfbuTKzhxSXDXCPasU=",
+    version = "v1.3.25",
+)
+
+go_repository(
+    name = "com_github_aws_aws_sdk_go_v2_internal_endpoints_v2",
+    importpath = "github.com/aws/aws-sdk-go-v2/internal/endpoints/v2",
+    sum = "h1:ZntTCl5EsYnhN/IygQEUugpdwbhdkom9uHcbCftiGgA=",
+    version = "v2.6.25",
+)
+
+go_repository(
+    name = "com_github_aws_aws_sdk_go_v2_service_secretsmanager",
+    importpath = "github.com/aws/aws-sdk-go-v2/service/secretsmanager",
+    sum = "h1:Nyfbgei75bohfmZNxgN27i528dGYVzqWJGlAO6lzXy8=",
+    version = "v1.34.7",
+)
+
+go_repository(
+    name = "com_github_aws_smithy_go",
+    importpath = "github.com/aws/smithy-go",
+    sum = "h1:/HPHZQ0g7f4eUeK6HKglFz8uwVfZKgoI25rb/J+dnro=",
+    version = "v1.22.1",
+)
 
 # gazelle:repository_macro deps.bzl%go_dependencies
 go_dependencies()
@@ -29,7 +64,7 @@ go_repositories()
 
 go_rules_dependencies()
 
-go_register_toolchains(version = "1.20.4")
+go_register_toolchains(version = "1.23.0")
 
 gazelle_dependencies()
 
@@ -49,7 +84,7 @@ load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
 
 protobuf_deps()
 
-# Docker 
+# Docker
 
 http_archive(
     name = "io_bazel_rules_docker",

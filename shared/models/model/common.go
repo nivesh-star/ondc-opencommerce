@@ -1410,7 +1410,7 @@ type XInputResponseInner struct {
 
 // Domain - Codification of domain for ONDC
 type Domain struct {
-	Value string `validate:"oneof=nic2004:52110 ONDC:RET10 ONDC:RET11 ONDC:RET12 ONDC:RET13 ONDC:RET14 ONDC:RET15 ONDC:RET16 ONDC:RET17 ONDC:RET18 ONDC:RET19"`
+	Value string `validate:"oneof=nic2004:52110 ONDC:RET10 ONDC:RET11 ONDC:RET12 ONDC:RET13 ONDC:RET14 ONDC:RET15 ONDC:RET16 ONDC:RET17 ONDC:RET18 ONDC:RET19 ONDC:FIS14"`
 }
 
 // UnmarshalJSON unmarshal underlying value

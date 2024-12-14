@@ -3,12 +3,12 @@
   "secretID": "test-secret",
   "topicID": "test-topic",
   "subscriptionID": [
-    "test-subscription"
+    "arn:aws:sns:us-east-1:000000000000:test-topic"
   ],
   "instanceID": "test-instance",
   "databaseID": "test-database",
   "gatewayURL": "https://preprod.gateway.ondc.org",
-  "subscriberID": "bpp.com",
-  "subscriberURL": "https://bpp.com/api",
+  "subscriberID": "b337-2405-201-4012-867-5c7e-9a95-17b6-3b71.ngrok-free.app",
+  "subscriberURL": "https://b337-2405-201-4012-867-5c7e-9a95-17b6-3b71.ngrok-free.app/",
   "keyID": "test-key"
 }

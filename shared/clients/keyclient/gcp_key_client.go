@@ -26,6 +26,13 @@ import (
 	"google.golang.org/api/option"
 )
 
+type SecretManagerKeyClientInterface interface {
+	Close() error
+	ServiceSigningPrivateKeyset(ctx context.Context) ([]byte, error)
+	ServiceEncryptionPrivateKey(ctx context.Context) ([]byte, error)
+	AddKey(ctx context.Context, secretID string, payload []byte) error
+}
+
 // SecretManagerKeyClient provides keys for encryption and authentication.
 type SecretManagerKeyClient struct {
 	secretClient *sm.Client

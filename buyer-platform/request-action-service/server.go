@@ -26,28 +26,43 @@ import (
 	"os"
 	"time"
 
-	"cloud.google.com/go/pubsub"
+	"github.com/aws/aws-sdk-go-v2/service/sns"
 	"github.com/benbjohnson/clock"
 	log "github.com/golang/glog"
-	"golang.org/x/sync/errgroup"
 	"google.golang.org/api/option"
 
 	"partner-innovation.googlesource.com/googleondcaccelerator.git/shared/clients/keyclient"
-	"partner-innovation.googlesource.com/googleondcaccelerator.git/shared/clients/transactionclient"
+	localstackclient "partner-innovation.googlesource.com/googleondcaccelerator.git/shared/clients/localstack-aws-client"
 	"partner-innovation.googlesource.com/googleondcaccelerator.git/shared/config"
 	"partner-innovation.googlesource.com/googleondcaccelerator.git/shared/models/model"
 	"partner-innovation.googlesource.com/googleondcaccelerator.git/shared/signing-authentication/authentication"
 )
 
 type server struct {
-	conf              config.RequestActionConfig
-	pubsubClient      *pubsub.Client
-	httpClient        *http.Client
-	keyClient         keyClient
-	transactionClient *transactionclient.Client
-	clk               clock.Clock
+	conf         config.RequestActionConfig
+	pubsubClient *sns.Client
+	httpClient   *http.Client
+	keyClient    keyClient
+	// transactionClient *transactionclient.Client
+	clk clock.Clock
 
-	subs []*pubsub.Subscription
+	subs []string
+}
+type Notification struct {
+	Type             string `json:"Type"`
+	MessageId        string `json:"MessageId"`
+	TopicArn         string `json:"TopicArn"`
+	Message          string `json:"Message"`
+	Timestamp        string `json:"Timestamp"`
+	UnsubscribeURL   string `json:"UnsubscribeURL"`
+	SignatureVersion string `json:"SignatureVersion"`
+	Signature        string `json:"Signature"`
+	SigningCertURL   string `json:"SigningCertURL"`
+}
+
+type MessageData struct {
+	Action string `json:"action,omitempty"`
+	Data   string `json:"data,omitempty"`
 }
 
 type keyClient interface {
@@ -68,7 +83,7 @@ func main() {
 		log.Exit(err)
 	}
 
-	keyClient, err := keyclient.New(ctx, conf.ProjectID, conf.SecretID)
+	keyClient, err := keyclient.NewAwsClient(ctx, conf.ProjectID, conf.SecretID)
 	if err != nil {
 		log.Exit(err)
 	}
@@ -77,12 +92,10 @@ func main() {
 	if err != nil {
 		log.Exit(err)
 	}
-	defer srv.close()
+	//defer srv.close()
 	log.Info("Server initialization successs")
 
-	if err := srv.serve(ctx); err != nil {
-		log.Exitf("Serving failed: %v", err)
-	}
+	srv.serve(ctx)
 }
 
 func initServer(ctx context.Context, conf config.RequestActionConfig, clk clock.Clock, keyClient keyClient, pubsubOpts, transportOpts []option.ClientOption) (*server, error) {
@@ -92,92 +105,98 @@ func initServer(ctx context.Context, conf config.RequestActionConfig, clk clock.
 	}
 
 	// init clients
-	pubsubClient, err := pubsub.NewClient(ctx, conf.ProjectID, pubsubOpts...)
+	pubsubClient, err := localstackclient.NewSNSClient(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("init server: %s", err)
 	}
-	transactionClient, err := transactionclient.New(ctx, conf.ProjectID, conf.InstanceID, conf.DatabaseID, transportOpts...)
-	if err != nil {
-		return nil, fmt.Errorf("init server: %s", err)
-	}
+
+	// transactionClient, err := transactionclient.New(ctx, conf.ProjectID, conf.InstanceID, conf.DatabaseID, transportOpts...)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("init server: %s", err)
+	// }
 
 	// validate the subscriptions
-	subs := make([]*pubsub.Subscription, 0, len(conf.SubscriptionID))
-	for _, subID := range conf.SubscriptionID {
-		sub := pubsubClient.Subscription(subID)
+	// subs := make([]*pubsub.Subscription, 0, len(conf.SubscriptionID))
+	// for _, subID := range conf.SubscriptionID {
+	// 	sub := pubsubClient.Subscription(subID)
 
-		ok, err := sub.Exists(ctx)
-		if err != nil {
-			return nil, err
-		}
-		if !ok {
-			return nil, fmt.Errorf("init server: subscription %q does not exist", sub.ID())
-		}
+	// 	ok, err := sub.Exists(ctx)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// 	if !ok {
+	// 		return nil, fmt.Errorf("init server: subscription %q does not exist", sub.ID())
+	// 	}
 
-		subs = append(subs, sub)
+	// 	subs = append(subs, sub)
+	// }
+	// _, err = pubsubClient.Subscribe(ctx, &sns.SubscribeInput{
+	// 	Protocol: aws.String("http"),
+	// 	TopicArn: &conf.SubscriptionID[0],
+	// 	Endpoint: aws.String("http://localhost:8081/sns"),
+	// })
+	if err != nil {
+		return nil, fmt.Errorf("init server: failed to subscribe to topic %v", err)
 	}
 
 	server := &server{
-		conf:              conf,
-		pubsubClient:      pubsubClient,
-		httpClient:        http.DefaultClient,
-		keyClient:         keyClient,
-		transactionClient: transactionClient,
-		clk:               clk,
-		subs:              subs,
+		conf:         conf,
+		pubsubClient: pubsubClient,
+		httpClient:   http.DefaultClient,
+		keyClient:    keyClient,
+		//transactionClient: transactionClient,
+		clk:  clk,
+		subs: conf.SubscriptionID,
 	}
 	return server, nil
 }
 
 // close closed underlying connections.
-func (s *server) close() {
-	s.pubsubClient.Close()
-}
+// func (s *server) close() {
+// 	s.pubsubClient.Close()
+// }
 
 // serve handles multiple Pub/Sub subscriptions in parallel.
-func (s *server) serve(ctx context.Context) error {
-	g, ctx := errgroup.WithContext(ctx)
-
-	for _, sub := range s.subs {
-		// create a local var for safety
-		sub := sub
-		g.Go(func() error {
-			return s.handleSubscription(ctx, sub)
-		})
+func (s *server) serve(ctx context.Context) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/sns", s.handleSubscription)
+	if err := http.ListenAndServe("0.0.0.0:8081", mux); err != nil {
+		log.Fatalf("failed to start HTTP server, %v", err)
 	}
-
-	log.Info("Ready to receive messages")
-	return g.Wait()
 }
 
 // handleSubscription receives and handles messages from the Pub/Sub subscription.
-func (s *server) handleSubscription(ctx context.Context, sub *pubsub.Subscription) error {
-	err := sub.Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
-		defer func() {
-			// Ack the msg irrespective of whether the message was successfully processed or not
-			// since we do not want the msg to be retried.
-			msg.Ack()
-			log.Infof("Handling of message %q ends", msg.ID)
-		}()
+func (s *server) handleSubscription(w http.ResponseWriter, r *http.Request) {
+	defer func() {
+		// Ack the msg irrespective of whether the message was successfully processed or not
+		// since we do not want the msg to be retried.
+		w.WriteHeader(http.StatusOK)
+		log.Infof("Handling of message ends")
+	}()
 
-		log.Infof("Receiving a message from %q, message ID: %q", sub.ID(), msg.ID)
+	payload := Notification{}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		http.Error(w, "Invalid message", http.StatusBadRequest)
+		return
+	}
 
-		// example action: `search`, `select`
-		action, ok := msg.Attributes["action"]
-		if !ok {
-			log.Error(`"action" attribute is not present in the message`)
-			return
+	log.Info("Received: ", payload.Type, "MessageId: ", payload.MessageId)
+
+	messageData := MessageData{}
+	if payload.Type == "Notification" {
+		if err := json.Unmarshal([]byte(payload.Message), &messageData); err != nil {
+			log.Fatalf("Failed to unmarshal nested message: %v", err)
 		}
 
 		var originalReq model.GenericRequest
-		if err := json.Unmarshal(msg.Data, &originalReq); err != nil {
+		if err := json.Unmarshal([]byte(messageData.Data), &originalReq); err != nil {
 			log.Errorf("Unmarshal request failed: %v", err)
 			return
 		}
 
 		// Determine the request endpoint
 		var url string
-		if action == "search" {
+		if messageData.Action == "search" {
 			url = s.conf.GatewayURL
 		} else {
 			url = originalReq.Context.BppURI
@@ -192,7 +211,7 @@ func (s *server) handleSubscription(ctx context.Context, sub *pubsub.Subscriptio
 			return
 		}
 
-		request, err := s.createONDCRequest(ctx, action, url, adjustedReqJSON)
+		request, err := s.createONDCRequest(r.Context(), messageData.Action, url, adjustedReqJSON)
 		if err != nil {
 			log.Errorf("Creating request failed: %v", err)
 			return
@@ -212,21 +231,20 @@ func (s *server) handleSubscription(ctx context.Context, sub *pubsub.Subscriptio
 			return
 		}
 
-		if err := s.storeTransaction(ctx, action, adjustedReqJSON, responseBody); err != nil {
-			log.Errorf("Storing transaction failed: %v", err)
-			return
-		}
+		// if err := s.storeTransaction(ctx, action, adjustedReqJSON, responseBody); err != nil {
+		// 	log.Errorf("Storing transaction failed: %v", err)
+		// 	return
+		// }
 
 		if response.StatusCode != http.StatusOK {
 			log.Infof("Sending request to ONDC network got an error: status code %d, body %s", response.StatusCode, responseBody)
 			return
 		}
 
-		log.Info("Handle the message successfully")
-		msg.Ack()
-	})
-
-	return err
+		w.WriteHeader(http.StatusOK)
+	} else {
+		// handle first time subscription confirmation message
+	}
 }
 
 // createONDCRequest create a HTTP request for ONDC network with a Authorization header.
@@ -255,61 +273,61 @@ func (s *server) createONDCRequest(ctx context.Context, action, url string, body
 	return request, nil
 }
 
-func (s *server) storeTransaction(ctx context.Context, action string, requestBody []byte, responseBody []byte) error {
-	switch action {
-	case "search":
-		return storeTransaction[model.SearchRequest](ctx, s, action, requestBody, responseBody)
-	case "select":
-		return storeTransaction[model.SelectRequest](ctx, s, action, requestBody, responseBody)
-	case "init":
-		return storeTransaction[model.InitRequest](ctx, s, action, requestBody, responseBody)
-	case "confirm":
-		return storeTransaction[model.ConfirmRequest](ctx, s, action, requestBody, responseBody)
-	case "track":
-		return storeTransaction[model.TrackRequest](ctx, s, action, requestBody, responseBody)
-	case "cancel":
-		return storeTransaction[model.CancelRequest](ctx, s, action, requestBody, responseBody)
-	case "update":
-		return storeTransaction[model.UpdateRequest](ctx, s, action, requestBody, responseBody)
-	case "status":
-		return storeTransaction[model.StatusRequest](ctx, s, action, requestBody, responseBody)
-	case "rating":
-		return storeTransaction[model.RatingRequest](ctx, s, action, requestBody, responseBody)
-	case "support":
-		return storeTransaction[model.SupportRequest](ctx, s, action, requestBody, responseBody)
-	}
-	return nil
-}
+// func (s *server) storeTransaction(ctx context.Context, action string, requestBody []byte, responseBody []byte) error {
+// 	switch action {
+// 	case "search":
+// 		return storeTransaction[model.SearchRequest](ctx, s, action, requestBody, responseBody)
+// 	case "select":
+// 		return storeTransaction[model.SelectRequest](ctx, s, action, requestBody, responseBody)
+// 	case "init":
+// 		return storeTransaction[model.InitRequest](ctx, s, action, requestBody, responseBody)
+// 	case "confirm":
+// 		return storeTransaction[model.ConfirmRequest](ctx, s, action, requestBody, responseBody)
+// 	case "track":
+// 		return storeTransaction[model.TrackRequest](ctx, s, action, requestBody, responseBody)
+// 	case "cancel":
+// 		return storeTransaction[model.CancelRequest](ctx, s, action, requestBody, responseBody)
+// 	case "update":
+// 		return storeTransaction[model.UpdateRequest](ctx, s, action, requestBody, responseBody)
+// 	case "status":
+// 		return storeTransaction[model.StatusRequest](ctx, s, action, requestBody, responseBody)
+// 	case "rating":
+// 		return storeTransaction[model.RatingRequest](ctx, s, action, requestBody, responseBody)
+// 	case "support":
+// 		return storeTransaction[model.SupportRequest](ctx, s, action, requestBody, responseBody)
+// 	}
+// 	return nil
+// }
 
-func storeTransaction[R model.BPPRequest](ctx context.Context, s *server, action string, requestBody []byte, responseBody []byte) error {
-	var request R
-	if err := json.Unmarshal(requestBody, &request); err != nil {
-		return err
-	}
-	msgContext := request.GetContext()
+// func storeTransaction[R model.BPPRequest](ctx context.Context, s *server, action string, requestBody []byte, responseBody []byte) error {
+// 	var request R
+// 	if err := json.Unmarshal(requestBody, &request); err != nil {
+// 		return err
+// 	}
+// 	msgContext := request.GetContext()
 
-	var response model.AckResponse
-	if err := json.Unmarshal(responseBody, &response); err != nil {
-		return err
-	}
+// 	var response model.AckResponse
+// 	if err := json.Unmarshal(responseBody, &response); err != nil {
+// 		return err
+// 	}
 
-	data := transactionclient.TransactionData{
-		ID:              *msgContext.TransactionID,
-		Type:            "REQUEST-ACTION",
-		API:             action,
-		MessageID:       *msgContext.MessageID,
-		Payload:         request,
-		ProviderID:      *msgContext.BapID,
-		MessageStatus:   response.Message.Ack.Status,
-		ReqReceivedTime: time.Now(),
-	}
+// 	data := transactionclient.TransactionData{
+// 		ID:              *msgContext.TransactionID,
+// 		Type:            "REQUEST-ACTION",
+// 		API:             action,
+// 		MessageID:       *msgContext.MessageID,
+// 		Payload:         request,
+// 		ProviderID:      *msgContext.BapID,
+// 		MessageStatus:   response.Message.Ack.Status,
+// 		ReqReceivedTime: time.Now(),
+// 	}
 
-	if response.Error != nil {
-		data.ErrorType = response.Error.Type
-		data.ErrorCode = *response.Error.Code
-		data.ErrorMessage = response.Error.Message
-		data.ErrorPath = response.Error.Path
-	}
+// 	if response.Error != nil {
+// 		data.ErrorType = response.Error.Type
+// 		data.ErrorCode = *response.Error.Code
+// 		data.ErrorMessage = response.Error.Message
+// 		data.ErrorPath = response.Error.Path
+// 	}
 
-	return s.transactionClient.StoreTransaction(ctx, data)
-}
+// 	return s.transactionClient.StoreTransaction(ctx, data)
+// }

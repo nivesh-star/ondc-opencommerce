@@ -26,17 +26,20 @@ import (
 	"os"
 
 	"cloud.google.com/go/pubsub"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/sns"
 	log "github.com/golang/glog"
 	"golang.org/x/sync/errgroup"
 
+	localstackclient "partner-innovation.googlesource.com/googleondcaccelerator.git/shared/clients/localstack-aws-client"
 	"partner-innovation.googlesource.com/googleondcaccelerator.git/shared/config"
 )
 
 type server struct {
-	pubsubClient *pubsub.Client
+	pubsubClient *sns.Client
 	httpClient   *http.Client
 	config       config.BuyerAdapterConfig
-	subs         []*pubsub.Subscription
+	subs         []string
 }
 
 func main() {
@@ -53,12 +56,12 @@ func main() {
 		log.Exit(err)
 	}
 
-	pubsubClient, err := pubsub.NewClient(ctx, conf.ProjectID)
+	snsClient, err := localstackclient.NewSNSClient(ctx)
 	if err != nil {
 		log.Exit(err)
 	}
 
-	srv, err := initServer(ctx, http.DefaultClient, pubsubClient, conf)
+	srv, err := initServer(ctx, http.DefaultClient, snsClient, conf)
 	if err != nil {
 		log.Exit(err)
 	}
@@ -69,7 +72,34 @@ func main() {
 	}
 }
 
-func initServer(ctx context.Context, httpClient *http.Client, pubsubClient *pubsub.Client, conf config.BuyerAdapterConfig) (*server, error) {
+func subscriptionExists(client *sns.Client, topicArn string) (bool, error) {
+	input := &sns.ListSubscriptionsByTopicInput{
+		TopicArn: aws.String(topicArn),
+	}
+
+	for {
+		output, err := client.ListSubscriptionsByTopic(context.TODO(), input)
+		if err != nil {
+			return false, err
+		}
+
+		// for _, sub := range output.Subscriptions {
+		// 	if aws.ToString(sub.Endpoint) == endpoint {
+		// 		return true, nil
+		// 	}
+		// }
+
+		if output.NextToken == nil {
+			break
+		}
+
+		input.NextToken = output.NextToken
+	}
+
+	return false, nil
+}
+
+func initServer(ctx context.Context, httpClient *http.Client, pubsubClient *sns.Client, conf config.BuyerAdapterConfig) (*server, error) {
 	// validate clients
 	if httpClient == nil {
 		return nil, errors.New("init server: HTTP client is nil")
@@ -78,19 +108,18 @@ func initServer(ctx context.Context, httpClient *http.Client, pubsubClient *pubs
 		return nil, errors.New("init server: Pub/Sub client is nil")
 	}
 
-	// validate the subscriptions
-	subs := make([]*pubsub.Subscription, 0, len(conf.SubscriptionID))
+	//validate the subscriptions
+	subs := make([]string, 0, len(conf.SubscriptionID))
 	for _, subID := range conf.SubscriptionID {
-		sub := pubsubClient.Subscription(subID)
-		ok, err := sub.Exists(ctx)
+		exist, err := subscriptionExists(pubsubClient, subID)
 		if err != nil {
-			return nil, fmt.Errorf("init server: checking if the subscription %q exists: %v", subID, err)
+			return nil, fmt.Errorf("init server: failed in checking if the subscription %q exists: %v", subID, err)
 		}
-		if !ok {
-			return nil, fmt.Errorf("init server: subscription %q does not exist", sub.ID())
+		if !exist {
+			return nil, fmt.Errorf("init server: subscription %q does not exist", subID)
 		}
 
-		subs = append(subs, sub)
+		subs = append(subs, subID)
 	}
 
 	server := &server{
@@ -120,7 +149,7 @@ func (s *server) serve(ctx context.Context) error {
 }
 
 // handleSubscription receives and handles messages from the Pub/Sub subscription.
-func (s *server) handleSubscription(ctx context.Context, sub *pubsub.Subscription) error {
+func (s *server) handleSubscription(ctx context.Context, sub pubsub.Message) error {
 	err := sub.Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
 		defer func() {
 			// Ack the msg irrespective of whether the message was successfully processed or not

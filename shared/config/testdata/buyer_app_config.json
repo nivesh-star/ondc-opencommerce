@@ -1,0 +1,5 @@
+{
+  "projectID": "test-project",
+  "port": 8080,
+  "topicID": "test-topic"
+}

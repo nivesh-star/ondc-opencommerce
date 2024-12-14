@@ -27,10 +27,12 @@ import (
 	"strconv"
 	"time"
 
-	"cloud.google.com/go/pubsub"
+	"github.com/aws/aws-sdk-go-v2/service/sns"
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/benbjohnson/clock"
 	log "github.com/golang/glog"
 
+	localstackclient "partner-innovation.googlesource.com/googleondcaccelerator.git/shared/clients/localstack-aws-client"
 	"partner-innovation.googlesource.com/googleondcaccelerator.git/shared/clients/registryclient"
 	"partner-innovation.googlesource.com/googleondcaccelerator.git/shared/clients/transactionclient"
 	"partner-innovation.googlesource.com/googleondcaccelerator.git/shared/config"
@@ -44,8 +46,8 @@ const psMsgIDHeader = "Pubsub-Message-ID"
 var validate = model.Validator()
 
 type server struct {
-	pubsubClient      *pubsub.Client
-	topic             *pubsub.Topic
+	pubsubClient      *sns.Client
+	topicArn          string
 	mux               http.Handler
 	port              int
 	transactionClient *transactionclient.Client
@@ -70,17 +72,17 @@ func main() {
 		log.Exit(err)
 	}
 
-	pubsubClient, err := pubsub.NewClient(ctx, conf.ProjectID)
+	pubsubClient, err := localstackclient.NewSNSClient(ctx)
 	if err != nil {
 		log.Exit(err)
 	}
 
-	transactionClient, err := transactionclient.New(ctx, conf.ProjectID, conf.InstanceID, conf.DatabaseID)
-	if err != nil {
-		log.Exit(err)
-	}
+	// transactionClient, err := transactionclient.New(ctx, conf.ProjectID, conf.InstanceID, conf.DatabaseID)
+	// if err != nil {
+	// 	log.Exit(err)
+	// }
 
-	srv, err := initServer(ctx, conf, pubsubClient, registryClient, transactionClient, clock.New())
+	srv, err := initServer(ctx, conf, pubsubClient, registryClient, nil, clock.New())
 	if err != nil {
 		log.Exit(err)
 	}
@@ -94,7 +96,7 @@ func main() {
 	}
 }
 
-func initServer(ctx context.Context, conf config.BAPAPIConfig, pubsubClient *pubsub.Client, registryClient middleware.RegistryClient, transactionClient *transactionclient.Client, clk clock.Clock) (*server, error) {
+func initServer(ctx context.Context, conf config.BAPAPIConfig, pubsubClient *sns.Client, registryClient middleware.RegistryClient, transactionClient *transactionclient.Client, clk clock.Clock) (*server, error) {
 	// validate clients
 	if pubsubClient == nil {
 		return nil, errors.New("init server: Pub/Sub client is nil")
@@ -102,22 +104,22 @@ func initServer(ctx context.Context, conf config.BAPAPIConfig, pubsubClient *pub
 	if registryClient == nil {
 		return nil, errors.New("init server: registry client is nil")
 	}
-	if transactionClient == nil {
-		return nil, errors.New("init server: transaction client is nil")
-	}
+	// if transactionClient == nil {
+	// 	return nil, errors.New("init server: transaction client is nil")
+	// }
 
-	topic := pubsubClient.Topic(conf.TopicID)
-	exist, err := topic.Exists(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("init server: %v", err)
-	}
-	if !exist {
-		return nil, fmt.Errorf("init server: topic %q does not exist", conf.TopicID)
-	}
+	// topic := pubsubClient.Topic(conf.TopicID)
+	// exist, err := topic.Exists(ctx)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("init server: %v", err)
+	// }
+	// if !exist {
+	// 	return nil, fmt.Errorf("init server: topic %q does not exist", conf.TopicID)
+	// }
 
 	srv := &server{
 		pubsubClient:      pubsubClient,
-		topic:             topic,
+		topicArn:          conf.TopicID,
 		port:              conf.Port,
 		transactionClient: transactionClient,
 	}
@@ -213,14 +215,22 @@ func (s *server) serve() error {
 
 // publishMessage publishes incoming request to the topic and return the publishing result.
 func (s *server) publishMessage(ctx context.Context, body []byte, action string) (msgID string, err error) {
-	msg := &pubsub.Message{
-		Data: body,
-		Attributes: map[string]string{
-			"action": action,
-		},
+	msg, err := json.Marshal(map[string]string{
+		"action": action,
+		"data":   string(body),
+	})
+	if err != nil {
+		log.Fatalf("failed to serialize message: %v", err)
 	}
-	result := s.topic.Publish(ctx, msg)
-	return result.Get(ctx)
+	out, err := s.pubsubClient.Publish(ctx, &sns.PublishInput{
+		Message:  aws.String(string(msg)),
+		TopicArn: &s.topicArn,
+	})
+	if err != nil {
+		return "", err
+	}
+
+	return *out.MessageId, nil
 }
 
 // genericHandler can handles all kind of ONDC request.
@@ -256,12 +266,12 @@ func genericHandler[R model.BAPRequest](s *server, action string, w http.Respons
 		return
 	}
 
-	if err := s.storeTransaction(ctx, action, "ACK", payload, payload.GetContext(), "", "", ""); err != nil {
-		log.Errorf("Store transaction for valid request failed: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
-		return
-	}
+	// if err := s.storeTransaction(ctx, action, "ACK", payload, payload.GetContext(), "", "", ""); err != nil {
+	// 	log.Errorf("Store transaction for valid request failed: %v", err)
+	// 	w.WriteHeader(http.StatusInternalServerError)
+	// 	w.Write([]byte(err.Error()))
+	// 	return
+	// }
 
 	msgID, err := s.publishMessage(ctx, body, action)
 	if err != nil {

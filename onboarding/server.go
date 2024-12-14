@@ -28,6 +28,7 @@ import (
 	"text/template"
 
 	log "github.com/golang/glog"
+	"github.com/joho/godotenv"
 
 	"partner-innovation.googlesource.com/googleondcaccelerator.git/shared/clients/keyclient"
 	"partner-innovation.googlesource.com/googleondcaccelerator.git/shared/config"
@@ -52,6 +53,7 @@ var siteVerificationTemplate = template.Must(template.New("site-verification").P
 type keyClient interface {
 	ServiceSigningPrivateKeyset(context.Context) ([]byte, error)
 	ServiceEncryptionPrivateKey(context.Context) ([]byte, error)
+	AddKey(context.Context, string, []byte) error
 }
 
 // server servs HTTP requests for onboarding and subscription flow
@@ -64,6 +66,7 @@ type server struct {
 }
 
 func main() {
+	err := godotenv.Load(".env")
 	flag.Set("alsologtostderr", "true")
 	ctx := context.Background()
 
@@ -104,11 +107,12 @@ func main() {
 		RegistryEncryptPubKey: registryEncryptPubKey,
 	}
 
-	keyClient, err := keyclient.New(ctx, conf.ProjectID, conf.SecretID)
+	//keyClient, err := keyclient.New(ctx, conf.ProjectID, conf.SecretID)
+	keyClient, err := keyclient.NewAwsClient(ctx, conf.ProjectID, conf.SecretID)
 	if err != nil {
 		log.Exit(err)
 	}
-	defer keyClient.Close()
+	//defer keyClient.Close()
 
 	srv, err := initServer(keyClient, conf)
 	if err != nil {
@@ -134,6 +138,10 @@ func initServer(keyClient keyClient, conf config.OnboardingConfig) (*server, err
 		return nil, fmt.Errorf("init server: invalid registry encryption public key: %v", err)
 	}
 
+	// fmt.Println(pubKeyByte)
+	// keyClient.AddKey(context.Background(), "encryptionKey", pubKeyByte)
+	// s, _ := keyClient.ServiceEncryptionPrivateKey(context.Background())
+	// fmt.Println(s)
 	server := &server{
 		keyClient:             keyClient,
 		conf:                  conf,

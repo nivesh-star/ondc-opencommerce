@@ -26,9 +26,11 @@ import (
 	"os"
 	"strconv"
 
-	"cloud.google.com/go/pubsub"
+	"github.com/aws/aws-sdk-go-v2/service/sns"
+	"github.com/aws/aws-sdk-go/aws"
 	log "github.com/golang/glog"
 
+	localstackclient "partner-innovation.googlesource.com/googleondcaccelerator.git/shared/clients/localstack-aws-client"
 	"partner-innovation.googlesource.com/googleondcaccelerator.git/shared/config"
 	"partner-innovation.googlesource.com/googleondcaccelerator.git/shared/errorcode"
 	"partner-innovation.googlesource.com/googleondcaccelerator.git/shared/middleware"
@@ -40,8 +42,8 @@ const psMsgIDHeader = "Pubsub-Message-ID"
 var validate = model.Validator()
 
 type server struct {
-	pubsubClient *pubsub.Client
-	topic        *pubsub.Topic
+	pubsubClient *sns.Client
+	topicArn     string
 	mux          http.Handler
 	conf         config.BuyerAppConfig
 }
@@ -60,7 +62,7 @@ func main() {
 		log.Exit(err)
 	}
 
-	pubsubClient, err := pubsub.NewClient(ctx, conf.ProjectID)
+	pubsubClient, err := localstackclient.NewSNSClient(ctx)
 	if err != nil {
 		log.Exit(err)
 	}
@@ -79,19 +81,18 @@ func main() {
 	}
 }
 
-func initServer(ctx context.Context, conf config.BuyerAppConfig, pubsubClient *pubsub.Client) (*server, error) {
-	topic := pubsubClient.Topic(conf.TopicID)
-	exist, err := topic.Exists(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("init server: checking if the topic %q exists: %v", conf.TopicID, err)
-	}
-	if !exist {
-		return nil, fmt.Errorf("init server: topic %q does not exist", conf.TopicID)
-	}
-
+func initServer(ctx context.Context, conf config.BuyerAppConfig, pubsubClient *sns.Client) (*server, error) {
+	// topic := pubsubClient.Topic(conf.TopicID)
+	// exist, err := topic.Exists(ctx)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("init server: checking if the topic %q exists: %v", conf.TopicID, err)
+	// }
+	// if !exist {
+	// 	return nil, fmt.Errorf("init server: topic %q does not exist", conf.TopicID)
+	// }
 	srv := &server{
 		pubsubClient: pubsubClient,
-		topic:        topic,
+		topicArn:     conf.TopicID,
 		conf:         conf,
 	}
 
@@ -121,6 +122,17 @@ func initServer(ctx context.Context, conf config.BuyerAppConfig, pubsubClient *p
 		middleware.Logging(),
 	)
 
+	output, err := pubsubClient.CreateTopic(ctx, &sns.CreateTopicInput{
+		Name: aws.String(conf.TopicID),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("init server: failed to create topic %v", err)
+	}
+	log.Info("Here is the topic ARN :", *output.TopicArn)
+	if err != nil {
+		log.Fatal("init server: failed to create topic %v", err)
+	}
+	srv.topicArn = *output.TopicArn
 	return srv, nil
 }
 
@@ -226,15 +238,35 @@ func nackResponse(w http.ResponseWriter) {
 
 // publishMessage publishes incoming request to the topic and return the publishing result.
 func (s *server) publishMessage(ctx context.Context, body []byte, action string) (msgID string, err error) {
-	msg := &pubsub.Message{
-		Data: body,
-		Attributes: map[string]string{
-			"action": action,
-		},
+	msg, err := json.Marshal(map[string]string{
+		"action": action,
+		"data":   string(body),
+	})
+	if err != nil {
+		log.Fatalf("failed to serialize message: %v", err)
 	}
-	result := s.topic.Publish(ctx, msg)
-	return result.Get(ctx)
+	out, err := s.pubsubClient.Publish(ctx, &sns.PublishInput{
+		Message:  aws.String(string(msg)),
+		TopicArn: &s.topicArn,
+	})
+	log.Info("published on ARN", s.topicArn, " Message id : ", *out.MessageId)
+	if err != nil {
+		return "", err
+	}
+
+	return *out.MessageId, nil
 }
+
+// func (s *server) publishMessage(ctx context.Context, body []byte, action string) (msgID string, err error) {
+// 	msg := &pubsub.Message{
+// 		Data: body,
+// 		Attributes: map[string]string{
+// 			"action": action,
+// 		},
+// 	}
+// 	result := s.topic.Publish(ctx, msg)
+// 	return result.Get(ctx)
+// }
 
 func (s *server) searchHandler(w http.ResponseWriter, r *http.Request) {
 	genericHandler[model.SearchRequest](s, "search", w, r)
