@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strconv"
 
 	"github.com/aws/aws-sdk-go-v2/service/sns"
@@ -52,12 +51,12 @@ func main() {
 	flag.Set("alsologtostderr", "true")
 	ctx := context.Background()
 
-	configPath, ok := os.LookupEnv("CONFIG")
-	if !ok {
-		log.Exit("CONFIG env is not set")
-	}
+	// configPath, ok := os.LookupEnv("CONFIG")
+	// if !ok {
+	// 	log.Exit("CONFIG env is not set")
+	// }
 
-	conf, err := config.Read[config.BuyerAppConfig](configPath)
+	conf, err := config.Read[config.BuyerAppConfig]("shared/config/testdata/buyer_app_config.json")
 	if err != nil {
 		log.Exit(err)
 	}

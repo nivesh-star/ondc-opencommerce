@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strconv"
 	"time"
 
@@ -33,7 +32,6 @@ import (
 	log "github.com/golang/glog"
 
 	localstackclient "partner-innovation.googlesource.com/googleondcaccelerator.git/shared/clients/localstack-aws-client"
-	"partner-innovation.googlesource.com/googleondcaccelerator.git/shared/clients/registryclient"
 	"partner-innovation.googlesource.com/googleondcaccelerator.git/shared/clients/transactionclient"
 	"partner-innovation.googlesource.com/googleondcaccelerator.git/shared/config"
 	"partner-innovation.googlesource.com/googleondcaccelerator.git/shared/errorcode"
@@ -57,20 +55,20 @@ func main() {
 	flag.Set("alsologtostderr", "true")
 	ctx := context.Background()
 
-	configPath, ok := os.LookupEnv("CONFIG")
-	if !ok {
-		log.Exit("CONFIG env is not set")
-	}
+	// configPath, ok := os.LookupEnv("CONFIG")
+	// if !ok {
+	// 	log.Exit("CONFIG env is not set")
+	// }
 
-	conf, err := config.Read[config.BAPAPIConfig](configPath)
+	conf, err := config.Read[config.BAPAPIConfig]("shared/config/testdata/bap_api.json")
 	if err != nil {
 		log.Exit(err)
 	}
 
-	registryClient, err := registryclient.New(conf.RegistryURL, conf.ONDCEnvironment)
-	if err != nil {
-		log.Exit(err)
-	}
+	// registryClient, err := registryclient.New(conf.RegistryURL, conf.ONDCEnvironment)
+	// if err != nil {
+	// 	log.Exit(err)
+	// }
 
 	pubsubClient, err := localstackclient.NewSNSClient(ctx)
 	if err != nil {
@@ -82,7 +80,7 @@ func main() {
 	// 	log.Exit(err)
 	// }
 
-	srv, err := initServer(ctx, conf, pubsubClient, registryClient, nil, clock.New())
+	srv, err := initServer(ctx, conf, pubsubClient, nil, nil, clock.New())
 	if err != nil {
 		log.Exit(err)
 	}
@@ -101,9 +99,9 @@ func initServer(ctx context.Context, conf config.BAPAPIConfig, pubsubClient *sns
 	if pubsubClient == nil {
 		return nil, errors.New("init server: Pub/Sub client is nil")
 	}
-	if registryClient == nil {
-		return nil, errors.New("init server: registry client is nil")
-	}
+	// if registryClient == nil {
+	// 	return nil, errors.New("init server: registry client is nil")
+	// }
 	// if transactionClient == nil {
 	// 	return nil, errors.New("init server: transaction client is nil")
 	// }
@@ -118,10 +116,10 @@ func initServer(ctx context.Context, conf config.BAPAPIConfig, pubsubClient *sns
 	// }
 
 	srv := &server{
-		pubsubClient:      pubsubClient,
-		topicArn:          conf.TopicID,
-		port:              conf.Port,
-		transactionClient: transactionClient,
+		pubsubClient: pubsubClient,
+		topicArn:     conf.TopicID,
+		port:         conf.Port,
+		//transactionClient: transactionClient,
 	}
 
 	mux := http.NewServeMux()
@@ -145,7 +143,7 @@ func initServer(ctx context.Context, conf config.BAPAPIConfig, pubsubClient *sns
 
 	srv.mux = middleware.Adapt(
 		mux,
-		middleware.NPAuthentication(registryClient, clk, errorcode.RoleBuyerApp, conf.SubscriberID),
+		//middleware.NPAuthentication(registryClient, clk, errorcode.RoleBuyerApp, conf.SubscriberID),
 		middleware.OnlyPostMethod(),
 		middleware.Logging(),
 	)
@@ -255,12 +253,12 @@ func genericHandler[R model.BAPRequest](s *server, action string, w http.Respons
 
 		errType := "JSON-SCHEMA-ERROR"
 		errCode := strconv.Itoa(errCodeInt)
-		if err := s.storeTransaction(ctx, action, "NACK", payload, payload.GetContext(), errType, errCode, err.Error()); err != nil {
-			log.Errorf("Store transaction for invalid request failed: %v", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(err.Error()))
-			return
-		}
+		// if err := s.storeTransaction(ctx, action, "NACK", payload, payload.GetContext(), errType, errCode, err.Error()); err != nil {
+		// 	log.Errorf("Store transaction for invalid request failed: %v", err)
+		// 	w.WriteHeader(http.StatusInternalServerError)
+		// 	w.Write([]byte(err.Error()))
+		// 	return
+		// }
 
 		nackResponse(w, errType, errCode)
 		return

@@ -21,6 +21,7 @@ package authentication
 
 import (
 	"bytes"
+	"crypto/ed25519"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -150,7 +151,7 @@ func VerifySignature(signature string, payload, publicKey []byte, createdTimesta
 
 // CreateAuthSignature creates a signature string in ONDC format.
 func CreateAuthSignature(payload, keysetJSON []byte, createdTimestamp, expiredTimestamp int64, subscriberID, keyID string) (string, error) {
-	signature, err := SignPayload(payload, keysetJSON, createdTimestamp, expiredTimestamp)
+	signature, err := SignRequest(keysetJSON, payload, createdTimestamp, expiredTimestamp)
 	if err != nil {
 		return "", err
 	}
@@ -181,4 +182,23 @@ func readJSONKeyset(keysetJSON []byte) (*keyset.Handle, error) {
 	keysetReader := bytes.NewReader(keysetJSON)
 	jsonReader := keyset.NewJSONReader(keysetReader)
 	return insecurecleartextkeyset.Read(jsonReader)
+}
+
+// /////// From old ondc source
+func SignRequest(privateKey []byte, payload []byte, createdTimestamp, expiredTimestamp int64) (string, error) {
+	signingString := createSigningString(payload, createdTimestamp, expiredTimestamp)
+	signature := ed25519.Sign(privateKey, []byte(signingString))
+	return base64.StdEncoding.EncodeToString(signature), nil
+}
+
+func VerifyRequest(signature string, payload, publicKey []byte, createdTimestamp, expiredTimestamp int64) bool {
+
+	signatureDecoded, err := base64.StdEncoding.DecodeString(signature)
+	if err != nil {
+		fmt.Println("failed to decode signature", err)
+		return false
+	}
+
+	signingString := createSigningString(payload, createdTimestamp, expiredTimestamp)
+	return ed25519.Verify(publicKey, []byte(signingString), signatureDecoded)
 }

@@ -7,8 +7,8 @@
   ],
   "instanceID": "test-instance",
   "databaseID": "test-database",
-  "gatewayURL": "https://preprod.gateway.ondc.org",
-  "subscriberID": "b337-2405-201-4012-867-5c7e-9a95-17b6-3b71.ngrok-free.app",
-  "subscriberURL": "https://b337-2405-201-4012-867-5c7e-9a95-17b6-3b71.ngrok-free.app/",
-  "keyID": "test-key"
+  "gatewayURL": "https://staging.gateway.proteantech.in",
+  "subscriberID": "app.mfapis.in",
+  "subscriberURL": "https://app.mfapis.in/",
+  "keyID": "3875f37b-df73-4592-9cb6-0887adf9b962"
 }

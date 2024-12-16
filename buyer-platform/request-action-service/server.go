@@ -18,14 +18,15 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 	"github.com/benbjohnson/clock"
 	log "github.com/golang/glog"
@@ -36,6 +37,13 @@ import (
 	"partner-innovation.googlesource.com/googleondcaccelerator.git/shared/config"
 	"partner-innovation.googlesource.com/googleondcaccelerator.git/shared/models/model"
 	"partner-innovation.googlesource.com/googleondcaccelerator.git/shared/signing-authentication/authentication"
+)
+
+const (
+	EncryptionPrivateKey = "MC4CAQEwBQYDK2VuBCIEIGhebaUMS8k7G3g8gpm/qx4+a8pZglOTO7RXDAcE9ehY"
+	request_id           = "smaple_request_id"
+	OndcPublicKey        = "MCowBQYDK2VuAyEAduMuZgmtpjdCuxv+Nc49K0cB6tL/Dj3HZetvVN7ZekM="
+	SigningPrivateKey    = "7qDUVwqw7Oe13JTa8nAM9ktLj12E4pxBDDxZN8qVwtvGglywynYJUPJo6B/vB5/Rwn2XSAKlKT5snQupvOU4/Q=="
 )
 
 type server struct {
@@ -54,7 +62,8 @@ type Notification struct {
 	TopicArn         string `json:"TopicArn"`
 	Message          string `json:"Message"`
 	Timestamp        string `json:"Timestamp"`
-	UnsubscribeURL   string `json:"UnsubscribeURL"`
+	SubscribeURL     string `json:"SubscribeURL,omitempty"`
+	UnsubscribeURL   string `json:"UnsubscribeURL,omitempty"`
 	SignatureVersion string `json:"SignatureVersion"`
 	Signature        string `json:"Signature"`
 	SigningCertURL   string `json:"SigningCertURL"`
@@ -67,18 +76,19 @@ type MessageData struct {
 
 type keyClient interface {
 	ServiceSigningPrivateKeyset(context.Context) ([]byte, error)
+	AddKey(ctx context.Context, key string, payload []byte) error
 }
 
 func main() {
 	flag.Set("alsologtostderr", "true")
 	ctx := context.Background()
 
-	configPath, ok := os.LookupEnv("CONFIG")
-	if !ok {
-		log.Exit("CONFIG env is not set")
-	}
+	// configPath, ok := os.LookupEnv("CONFIG")
+	// if !ok {
+	// 	log.Exit("CONFIG env is not set")
+	// }
 
-	conf, err := config.Read[config.RequestActionConfig](configPath)
+	conf, err := config.Read[config.RequestActionConfig]("/Users/sandeep.sharma/workspace/nivesh/ondc-opencommerce/shared/config/testdata/callback_action.json")
 	if err != nil {
 		log.Exit(err)
 	}
@@ -110,6 +120,18 @@ func initServer(ctx context.Context, conf config.RequestActionConfig, clk clock.
 		return nil, fmt.Errorf("init server: %s", err)
 	}
 
+	//TODO: Remove
+	keybytes, _ := base64.StdEncoding.DecodeString(SigningPrivateKey)
+	err = keyClient.AddKey(ctx, "signingKey", keybytes)
+	if err != nil {
+		log.Fatal("failed to create signing key in aws secretes manager", err)
+	}
+
+	pubsubClient.Subscribe(ctx, &sns.SubscribeInput{
+		Protocol: aws.String("http"),
+		TopicArn: aws.String(conf.SubscriptionID[0]),
+		Endpoint: aws.String("http://cea5-2405-201-4012-867-2d4c-99f6-c9dd-c239.ngrok-free.app/sns"),
+	})
 	// transactionClient, err := transactionclient.New(ctx, conf.ProjectID, conf.InstanceID, conf.DatabaseID, transportOpts...)
 	// if err != nil {
 	// 	return nil, fmt.Errorf("init server: %s", err)
@@ -167,12 +189,12 @@ func (s *server) serve(ctx context.Context) {
 
 // handleSubscription receives and handles messages from the Pub/Sub subscription.
 func (s *server) handleSubscription(w http.ResponseWriter, r *http.Request) {
-	defer func() {
-		// Ack the msg irrespective of whether the message was successfully processed or not
-		// since we do not want the msg to be retried.
-		w.WriteHeader(http.StatusOK)
-		log.Infof("Handling of message ends")
-	}()
+	// defer func() {
+	// 	// Ack the msg irrespective of whether the message was successfully processed or not
+	// 	// since we do not want the msg to be retried.
+	// 	w.WriteHeader(http.StatusOK)
+	// 	log.Infof("Handling of message ends")
+	// }()
 
 	payload := Notification{}
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
@@ -217,6 +239,18 @@ func (s *server) handleSubscription(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		// bodyBytes, err := io.ReadAll(request.Body)
+		// if err != nil {
+		// 	return
+		// }
+
+		// hhdr := request.Header.Get("Authorization")
+		// info, err := authentication.ExtractInfoFromHeader(hhdr)
+		// if err != nil {
+		// 	log.Errorf("gaye")
+		// }
+		// kk, _ := base64.StdEncoding.DecodeString("xoJcsMp2CVDyaOgf7wef0cJ9l0gCpSk+bJ0LqbzlOP0=")
+		// fmt.Println("sign locl ver: ", authentication.VerifyRequest(info.Signature, bodyBytes, kk, info.Created, info.Expired))
 		// send a request to ONDC network
 		response, err := s.httpClient.Do(request)
 		if err != nil {
@@ -243,7 +277,18 @@ func (s *server) handleSubscription(w http.ResponseWriter, r *http.Request) {
 
 		w.WriteHeader(http.StatusOK)
 	} else {
-		// handle first time subscription confirmation message
+		request, err := http.NewRequest(http.MethodGet, payload.SubscribeURL, nil)
+		if err != nil {
+			log.Error("failed to confirm topic subscription", err.Error())
+			return
+		}
+		// send a request to ONDC network
+		_, err = s.httpClient.Do(request)
+		if err != nil {
+			log.Errorf("Sending request to ONDC network failed: %v", err)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
 	}
 }
 
