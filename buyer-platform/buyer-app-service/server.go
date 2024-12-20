@@ -56,7 +56,7 @@ func main() {
 	// 	log.Exit("CONFIG env is not set")
 	// }
 
-	conf, err := config.Read[config.BuyerAppConfig]("shared/config/testdata/buyer_app_config.json")
+	conf, err := config.Read[config.BuyerAppConfig]("./buyer_app_config.json")
 	if err != nil {
 		log.Exit(err)
 	}

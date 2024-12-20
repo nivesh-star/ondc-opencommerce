@@ -1,0 +1,20 @@
+# Build stage
+FROM golang:1.23 as builder
+WORKDIR /app
+
+COPY ./go.mod /app
+COPY ./go.sum /app
+# RUN go mod tidy
+# Copy source files
+COPY ./shared /app/shared
+COPY ./buyer-platform/buyer-app-service /app/buyer-app-service
+# Download dependencies and build the binary
+RUN GOARCH=amd64 GOOS=linux go build -o app-buyer-app-service buyer-app-service/server.go
+
+# Final stage
+FROM alpine:3.17
+WORKDIR /app
+COPY --from=builder /app/app-buyer-app-service /app/
+COPY --from=builder /app/shared/config/testdata/* /app/
+RUN ls -alh /app
+CMD ["./app-buyer-app-service"]

@@ -185,18 +185,18 @@ func (a *authenticator) unauthenticated(w http.ResponseWriter, reason string) {
 	errCodeStr := strconv.Itoa(errCode)
 
 	response := model.Ack{
-		Status: errorcode.ToPointer("NACK"),
+		Status: "NACK",
 		Tags: []model.TagGroup{
 			{
-				Display: errorcode.ToPointer(false),
+				Display: false,
 				List: []model.Tag{
 					{
-						Display: errorcode.ToPointer(true),
-						Value:   errorcode.ToPointer(reason),
+						Display: true,
+						Value:   reason,
 					},
 					{
-						Display: errorcode.ToPointer(true),
-						Value:   errorcode.ToPointer(errCodeStr),
+						Display: true,
+						Value:   errCodeStr,
 					},
 				},
 			},

@@ -2,6 +2,7 @@ package localstackclient
 
 import (
 	"context"
+	"os"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -10,25 +11,6 @@ import (
 )
 
 func NewSNSClient(ctx context.Context) (*sns.Client, error) {
-
-	// l, err := localstack.NewInstance()
-	// if err != nil {
-	// 	log.Fatal("Could not connect to Docker %v", err)
-	// }
-	// if err := l.Start(); err != nil {
-	// 	log.Fatal("Could not start localstack %v", err)
-	// }
-
-	// cfg, err := awsconfig.LoadDefaultConfig(ctx,
-	// 	awsconfig.WithRegion("us-east-1"),
-	// 	awsconfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider("dummy", "dummy", "dummy")),
-	// )
-	// if err != nil {
-	// 	log.Fatal("Could not get config %v", err)
-	// }
-	// resolver := localstack.NewSnsResolverV2(l)
-	// client := sns.NewFromConfig(cfg, sns.WithEndpointResolverV2(resolver))
-	// return client, nil
 
 	cfg, err := config.LoadDefaultConfig(context.TODO(),
 		config.WithRegion("us-east-1"),
@@ -39,6 +21,6 @@ func NewSNSClient(ctx context.Context) (*sns.Client, error) {
 	}
 
 	return sns.NewFromConfig(cfg, func(o *sns.Options) {
-		o.BaseEndpoint = aws.String("http://localhost:4566")
+		o.BaseEndpoint = aws.String(os.Getenv("AWS_ENDPOINT"))
 	}), nil
 }

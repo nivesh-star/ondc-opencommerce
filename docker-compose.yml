@@ -1,0 +1,27 @@
+version: '3.7'
+services:
+  localstack:
+    image: localstack/localstack
+    container_name: localstack
+    ports:
+      - "4566:4566"  # Exposing the LocalStack services port
+    networks:
+      - localstack-network
+    environment:
+      - DOCKER_HOST=unix:///var/run/docker.sock  # Required for LocalStack to interact with Docker
+
+  buyer-app-service:
+    image: buyer-app-service  # Replace with the actual image name for your app
+    container_name: buyer-app-service
+    depends_on:
+      - localstack  # Ensure localstack is ready before the app starts
+    networks:
+      - localstack-network
+    environment:
+      - AWS_ENDPOINT=http://localstack:4566  # LocalStack endpoint using container name
+    ports:
+      - "8080:8080"  # Exposing app port (adjust as needed)
+
+networks:
+  localstack-network:
+    driver: bridge  # Use bridge network driver to allow inter-container communication
