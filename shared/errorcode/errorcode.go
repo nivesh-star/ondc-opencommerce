@@ -64,3 +64,7 @@ func Lookup(role Role, err ErrType) (int, bool) {
 	code, ok := lookupTable[lookupKey{role: role, err: err}]
 	return code, ok
 }
+
+func ToPointer[T any](v T) *T {
+	return &v
+}

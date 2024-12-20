@@ -122,8 +122,8 @@ type UpdateMessage struct {
 
 // RatingRequest contains rating feedback for a service.
 type RatingRequest struct {
-	Context *Context `json:"context" validate:"required"`
-	Message *Rating  `json:"message" validate:"required"`
+	Context *Context  `json:"context" validate:"required"`
+	Message []*Rating `json:"message" validate:"required"`
 }
 
 // SupportRequest contains needed information for contacting a support.

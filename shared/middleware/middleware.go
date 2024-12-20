@@ -127,21 +127,21 @@ func (a *authenticator) authentication(handler http.Handler) http.Handler {
 		if err != nil {
 			log.Errorf("Invalid %q header format: %s", a.verifyingHeader, err)
 			log.Errorf("Invalid %q header value: %q", a.verifyingHeader, header)
-			a.unauthenticated(w)
+			a.unauthenticated(w, "Invalid Header: Invalid header format")
 			return
 		}
 
 		if info.Algorithm != info.KeyIDAlgorithm {
 			log.Errorf("Invalid %q header: algorithms do not match", a.verifyingHeader)
 			log.Errorf("Invalid %q header: algorithm=%q, Key ID algorithm=%q", a.verifyingHeader, info.Algorithm, info.KeyIDAlgorithm)
-			a.unauthenticated(w)
+			a.unauthenticated(w, "Invalid header: Algorith do not match with Key ID algoritgm")
 			return
 		}
 
 		currentTimestamp := a.clock.Now().Unix()
 		if info.Created > currentTimestamp || info.Expired < currentTimestamp {
 			log.Errorf("Invalid %q header: invalid timestamps: created=%d, expired=%d", a.verifyingHeader, info.Created, info.Expired)
-			a.unauthenticated(w)
+			a.unauthenticated(w, "Invalid Header: Ivalid timestamps")
 			return
 		}
 
@@ -155,20 +155,20 @@ func (a *authenticator) authentication(handler http.Handler) http.Handler {
 		decoder := json.NewDecoder(bytes.NewReader(body))
 		if err := decoder.Decode(&ondcCtx); err != nil {
 			log.Errorf("Decode context failed: %s", err)
-			a.unauthenticated(w)
+			a.unauthenticated(w, "Bad request: Failed to decode Request Context")
 			return
 		}
 
 		ed25519PublicKey, err := a.registryClient.PublicSigningKey(info.SubscriberID, info.UniqueKeyID, ondcCtx.Context)
 		if err != nil {
 			log.Errorf("Get public signing key from registry failed: %s", err)
-			a.unauthenticated(w)
+			a.unauthenticated(w, "Internal server error: Server failed to get public registry key")
 			return
 		}
 
 		if err := auth.VerifySignature(info.Signature, body, ed25519PublicKey, info.Created, info.Expired); err != nil {
 			log.Errorf("Verify signature failed: %s", err)
-			a.unauthenticated(w)
+			a.unauthenticated(w, "Bad request: Signature Verification failed")
 			return
 		}
 
@@ -177,22 +177,29 @@ func (a *authenticator) authentication(handler http.Handler) http.Handler {
 }
 
 // unauthenticated writes a proper response when the request authentication fails.
-func (a *authenticator) unauthenticated(w http.ResponseWriter) {
+func (a *authenticator) unauthenticated(w http.ResponseWriter, reason string) {
 	errCode, ok := errorcode.Lookup(a.role, errorcode.ErrInvalidSignature)
 	if !ok {
 		http.Error(w, "", http.StatusInternalServerError)
 	}
 	errCodeStr := strconv.Itoa(errCode)
 
-	response := model.AckResponse{
-		Message: &model.MessageAck{
-			Ack: &model.Ack{
-				Status: "NACK",
+	response := model.Ack{
+		Status: errorcode.ToPointer("NACK"),
+		Tags: []model.TagGroup{
+			{
+				Display: errorcode.ToPointer(false),
+				List: []model.Tag{
+					{
+						Display: errorcode.ToPointer(true),
+						Value:   errorcode.ToPointer(reason),
+					},
+					{
+						Display: errorcode.ToPointer(true),
+						Value:   errorcode.ToPointer(errCodeStr),
+					},
+				},
 			},
-		},
-		Error: &model.Error{
-			Type: "CONTEXT-ERROR",
-			Code: &errCodeStr,
 		},
 	}
 	responseJSON, err := json.Marshal(&response)

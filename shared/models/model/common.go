@@ -1,1494 +1,924 @@
-// Copyright 2023 Google LLC
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
-// Package model contains schemas for request/response of ONDC Core API
-//
-// Most schema definitions are generated with [OpenAPI Generator]. The OpenAPI specification used
-// to generate schema is [Retail API v1.0.30]. The generator option is [go-server].
-//
-// [OpenAPI Generator]: https://openapi-generator.tech
-// [Retail API v1.0.30]: https://app.swaggerhub.com/apis/ONDC/ONDC-Protocol-Retail/1.0.30
-// [go-server]: https://openapi-generator.tech/docs/generators/go-server
 package model
 
-import (
-	"encoding/json"
-	"time"
-)
+import "time"
 
-// AckResponse contains acknowledgement of the request.
-type AckResponse struct {
-	Message *MessageAck `json:"message,omitempty"`
-	Error   *Error      `json:"error,omitempty"`
+// Every API call in beckn protocol has a context. It provides a high-level overview to the receiver about the nature of the intended transaction. Typically, it is the BAP that sets the transaction context based on the consumer's location and action on their UI. But sometimes, during unsolicited callbacks, the BPP also sets the transaction context but it is usually the same as the context of a previous full-cycle, request-callback interaction between the BAP and the BPP. The context object contains four types of fields. <ol><li>Demographic information about the transaction using fields like `domain`, `country`, and `region`.</li><li>Addressing details like the sending and receiving platform's ID and API URL.</li><li>Interoperability information like the protocol version that implemented by the sender and,</li><li>Transaction details like the method being called at the receiver's endpoint, the transaction_id that represents an end-to-end user session at the BAP, a message ID to pair requests with callbacks, a timestamp to capture sending times, a ttl to specifiy the validity of the request, and a key to encrypt information if necessary.</li></ol> This object must be passed in every interaction between a BAP and a BPP. In HTTP/S implementations, it is not necessary to send the context during the synchronous response. However, in asynchronous protocols, the context must be sent during all interactions,
+type Context struct {
+	// Domain code that is relevant to this transaction context
+	Domain string `json:"domain,omitempty"`
+	// The location where the transaction is intended to be fulfilled.
+	Location *Location `json:"location,omitempty"`
+	// The Beckn protocol method being called by the sender and executed at the receiver.
+	Action string `json:"action,omitempty"`
+	// Version of transaction protocol being used by the sender.
+	Version string `json:"version,omitempty"`
+	// Subscriber ID of the BAP
+	BapId string `json:"bap_id,omitempty"`
+	// Subscriber URL of the BAP for accepting callbacks from BPPs.
+	BapUri string `json:"bap_uri,omitempty"`
+	// Subscriber ID of the BPP
+	BppId string `json:"bpp_id,omitempty"`
+	// Subscriber URL of the BPP for accepting calls from BAPs.
+	BppUri string `json:"bpp_uri,omitempty"`
+	// This is a unique value which persists across all API calls from `search` through `confirm`. This is done to indicate an active user session across multiple requests. The BPPs can use this value to push personalized recommendations, and dynamic offerings related to an ongoing transaction despite being unaware of the user active on the BAP.
+	TransactionId string `json:"transaction_id,omitempty"`
+	// This is a unique value which persists during a request / callback cycle. Since beckn protocol APIs are asynchronous, BAPs need a common value to match an incoming callback from a BPP to an earlier call. This value can also be used to ignore duplicate messages coming from the BPP. It is recommended to generate a fresh message_id for every new interaction. When sending unsolicited callbacks, BPPs must generate a new message_id.
+	MessageId string `json:"message_id,omitempty"`
+	// Time of request generation in RFC3339 format
+	Timestamp time.Time `json:"timestamp,omitempty"`
+	// The encryption public key of the sender
+	Key string `json:"key,omitempty"`
+	// The duration in ISO8601 format after timestamp for which this message holds valid
+	Ttl string `json:"ttl,omitempty"`
 }
 
-// MessageAck is an inner message of AckResponse.
-type MessageAck struct {
-	Ack *Ack `json:"ack" validate:"required"`
-}
-
-// Ack - Describes the ACK response
-type Ack struct {
-	// Describe the status of the ACK response. If schema validation passes, status is ACK else it is NACK
-	Status string `json:"status" validate:"oneof=ACK NACK"`
-
-	// A list of tags containing any additional information sent along with the Acknowledgement.
-	Tags []TagGroup `json:"tags,omitempty"`
-}
-
-// AddOn - Describes an add-on
-type AddOn struct {
-	// ID of the add-on. This follows the syntax {item.id}/add-on/{add-on unique id} for item specific add-on OR
-	ID string `json:"id,omitempty"`
-
+type Location struct {
+	Id         string      `json:"id,omitempty"`
 	Descriptor *Descriptor `json:"descriptor,omitempty"`
-
-	Price *Price `json:"price,omitempty"`
+	// The url to the map of the location. This can be a globally recognized map url or the one specified by the network policy.
+	MapUrl string `json:"map_url,omitempty"`
+	// The GPS co-ordinates of this location.
+	Gps string `json:"gps,omitempty"`
+	// The address of this location.
+	Address string `json:"address,omitempty"`
+	// The city this location is, or is located within
+	City *City `json:"city,omitempty"`
+	// The state this location is, or is located within
+	District string `json:"district,omitempty"`
+	// The state this location is, or is located within
+	State *State `json:"state,omitempty"`
+	// The country this location is, or is located within
+	Country  *Country `json:"country,omitempty"`
+	AreaCode string   `json:"area_code,omitempty"`
+	Circle   *Circle  `json:"circle,omitempty"`
+	// The boundary polygon of this location
+	Polygon string `json:"polygon,omitempty"`
+	// The three dimensional region describing this location
+	Var3dspace string `json:"3dspace,omitempty"`
+	// The rating of this location
+	Rating string `json:"rating,omitempty"`
 }
 
-// Address - Describes an address
-type Address struct {
-	// Door / Shop number of the address
-	Door string `json:"door,omitempty"`
-
-	// Name of address if applicable. Example, shop name
-	Name string `json:"name,omitempty"`
-
-	// Name of the building or block
-	Building string `json:"building,omitempty"`
-
-	// Street name or number
-	Street string `json:"street,omitempty"`
-
-	// Name of the locality, apartments
-	Locality string `json:"locality,omitempty"`
-
-	// Name or number of the ward if applicable
-	Ward string `json:"ward,omitempty"`
-
-	// City name
-	City string `json:"city,omitempty"`
-
-	// State name
-	State string `json:"state,omitempty"`
-
-	// Country name
-	Country string `json:"country,omitempty"`
-
-	// Area code. This can be Pincode, ZIP code or any equivalent
-	AreaCode string `json:"area_code,omitempty"`
+// Physical description of something.
+type Descriptor struct {
+	Name           string                    `json:"name,omitempty"`
+	Code           string                    `json:"code,omitempty"`
+	ShortDesc      string                    `json:"short_desc,omitempty"`
+	LongDesc       string                    `json:"long_desc,omitempty"`
+	AdditionalDesc *DescriptorAdditionalDesc `json:"additional_desc,omitempty"`
+	Media          []MediaFile               `json:"media,omitempty"`
+	Images         []Image                   `json:"images,omitempty"`
 }
 
-// Agent - Describes an order executor
-type Agent struct {
-	Person
-	Contact
-
-	// Since both `Person` and `contact` struct have `Tags` field,
-	// we need to add this `Tags` field to avoid ambiguity.
-	Tags *TagGroup `json:"tags,omitempty"`
-
-	Rateable *Rateable `json:"rateable,omitempty"`
+type DescriptorAdditionalDesc struct {
+	Url         string `json:"url,omitempty"`
+	ContentType string `json:"content_type,omitempty"`
 }
 
-// Authorization - Describes an authorization mechanism
-type Authorization struct {
-	// Type of authorization mechanism used
-	Type string `json:"type,omitempty"`
-
-	// Token used for authorization
-	Token string `json:"token,omitempty"`
-
-	// Timestamp in RFC3339 format from which token is valid
-	ValidFrom time.Time `json:"valid_from,omitempty"`
-
-	// Timestamp in RFC3339 format until which token is valid
-	ValidTo time.Time `json:"valid_to,omitempty"`
-
-	// Status of the token
-	Status string `json:"status,omitempty"`
+// This object contains a url to a media file.
+type MediaFile struct {
+	// indicates the nature and format of the document, file, or assortment of bytes. MIME types are defined and standardized in IETF's RFC 6838
+	Mimetype string `json:"mimetype,omitempty"`
+	// The URL of the file
+	Url string `json:"url,omitempty"`
+	// The digital signature of the file signed by the sender
+	Signature string `json:"signature,omitempty"`
+	// The signing algorithm used by the sender
+	Dsa string `json:"dsa,omitempty"`
 }
 
-// Billing - Describes a billing event
-type Billing struct {
-	// Personal details of the customer needed for billing.
-	Name string `json:"name,omitempty"`
-
-	Organization *Organization `json:"organization,omitempty"`
-
-	Address *Address `json:"address,omitempty"`
-
-	Email string `json:"email,omitempty"`
-
-	Phone string `json:"phone,omitempty"`
-
-	Time *Time `json:"time,omitempty"`
-
-	// GST number
-	TaxNumber string `json:"tax_number,omitempty"`
-
-	CreatedAt time.Time `json:"created_at,omitempty"`
-
-	UpdatedAt time.Time `json:"updated_at,omitempty"`
+// Describes an image
+type Image struct {
+	// URL to the image. This can be a data url or an remote url
+	Url string `json:"url,omitempty"`
+	// The size of the image. The network policy can define the default dimensions of each type
+	SizeType string `json:"size_type,omitempty"`
+	// Width of the image in pixels
+	Width string `json:"width,omitempty"`
+	// Height of the image in pixels
+	Height string `json:"height,omitempty"`
 }
-
-// Cancellation - Describes a cancellation event
-type Cancellation struct {
-	Type *string `json:"type,omitempty" validate:"omitempty,oneof=full partial"`
-
-	RefID string `json:"ref_id,omitempty"`
-
-	Policies []Policy `json:"policies,omitempty"`
-
-	Time time.Time `json:"time,omitempty"`
-
-	CancelledBy string `json:"cancelled_by,omitempty"`
-
-	Reasons *Option `json:"reasons,omitempty"`
-
-	SelectedReason *struct {
-		ID string `json:"id,omitempty"`
-	} `json:"selected_reason,omitempty"`
-
-	AdditionalDescription *Descriptor `json:"additional_description,omitempty"`
-}
-
-// CancellationTerm - Describes the cancellation terms of an item or an order.
-//
-// This can be referenced at an item or order level. Item-level cancellation terms can override the terms at the order level.
-type CancellationTerm struct {
-	// Indicates whether a reason is required to cancel the order
-	ReasonRequired bool `json:"reason_required,omitempty"`
-
-	// Indicates if cancellation will result in a refund
-	RefundEligible bool `json:"refund_eligible,omitempty"`
-
-	// Indicates if cancellation will result in a return to origin
-	ReturnEligible bool `json:"return_eligible,omitempty"`
-
-	// The state of fulfillment during which these terms are applicable.
-	FulfillmentState *struct {
-		State
-	} `json:"fulfillment_state,omitempty"`
-
-	// Describes the return policy of an item or an order
-	ReturnPolicy *struct {
-
-		// Indicates if cancellation will result in a return to origin
-		ReturnEligible bool `json:"return_eligible,omitempty"`
-
-		// Applicable only for buyer managed returns where the buyer has to return the item to the origin before a certain date-time,
-		// failing which they will not be eligible for refund.
-		ReturnWithin *struct {
-			Time
-		} `json:"return_within,omitempty"`
-
-		ReturnLocation       *Location `json:"return_location,omitempty"`
-		FulfillmentManagedBy *string   `json:"fulfillment_managed_by,omitempty" validate:"omitempty,oneof=customer provider"`
-	} `json:"return_policy,omitempty"`
-
-	RefundPolicy *struct {
-		// Indicates if cancellation will result in a refund
-		RefundEligible bool `json:"refund_eligible,omitempty"`
-
-		// Time within which refund will be processed after successful cancellation.
-		RefundWithin *struct {
-			Time
-		} `json:"refund_within,omitempty"`
-
-		RefundAmount *Price `json:"refund_amount,omitempty"`
-	} `json:"refund_policy,omitempty"`
-
-	// Information related to the time of cancellation.
-	CancelBy *struct {
-		Time
-	} `json:"cancel_by,omitempty"`
-
-	CancellationFee *Fee            `json:"cancellation_fee,omitempty"`
-	XInputRequired  *XInput         `json:"xinput_required,omitempty"`
-	XInputResponse  *XInputResponse `json:"xinput_response,omitempty"`
-	ExternalRef     *MediaFile      `json:"external_ref,omitempty"`
-}
-
-// Catalog - Describes a Seller App catalog
-type Catalog struct {
-	BppDescriptor   *Descriptor   `json:"bpp/descriptor,omitempty"`
-	BppCategories   []Category    `json:"bpp/categories,omitempty"`
-	BppFulfillments []Fulfillment `json:"bpp/fulfillments,omitempty"`
-	BppPayments     []Payment     `json:"bpp/payments,omitempty"`
-	BppOffers       []Offer       `json:"bpp/offers,omitempty"`
-	BppProviders    []Provider    `json:"bpp/providers,omitempty"`
-
-	// Time after which catalog has to be refreshed
-	Exp time.Time `json:"exp,omitempty"`
-}
-
-// Category - Describes a category
-type Category struct {
-	// Unique id of the category
-	ID string `json:"id,omitempty"`
-
-	// Unique id of the category
-	ParentCategoryID string `json:"parent_category_id,omitempty"`
-
-	Descriptor *Descriptor `json:"descriptor,omitempty"`
-
-	Time *Time `json:"time,omitempty"`
-
-	Tags *TagGroup `json:"tags,omitempty"`
-}
-
-// Circle - Describes a circular area on the map
-type Circle struct {
-	Gps *GPS `json:"gps" validate:"required"`
-
-	Radius *Scalar `json:"radius" validate:"required"`
-}
-
-// City - Describes a city
 type City struct {
 	// Name of the city
 	Name string `json:"name,omitempty"`
-
-	// Codification of city code will be using the std code of the city e.g. for Bengaluru, city code is 'std:080'
+	// City code
 	Code string `json:"code,omitempty"`
 }
 
-type Contact struct {
-	Phone string `json:"phone,omitempty"`
-
-	Email string `json:"email,omitempty"`
-
-	Tags *TagGroup `json:"tags,omitempty"`
+// A bounded geopolitical region of governance inside a country.
+type State struct {
+	// Name of the state
+	Name string `json:"name,omitempty"`
+	// State code as per country or international standards
+	Code string `json:"code,omitempty"`
 }
 
-// Context - Describes a ONDC message context
-type Context struct {
-	Domain *Domain `json:"domain" validate:"required"`
-
-	// Country code as per ISO 3166 Alpha-3 code format
-	Country *string `json:"country" validate:"required"`
-
-	// Codification of city code will be using the std code of the city e.g. for Bengaluru, city code is 'std:080'
-	City *string `json:"city" validate:"required"`
-
-	// Defines the ONDC API call. Any actions other than the enumerated actions are not supported by ONDC Protocol
-	Action string `json:"action" validate:"oneof=search select init confirm update status track cancel rating support on_search on_select on_init on_confirm on_update on_status on_track on_cancel on_rating on_support"`
-
-	// Version of ONDC core API specification being used
-	CoreVersion *string `json:"core_version" validate:"required"`
-
-	// Unique id of the Buyer App. By default it is the fully qualified domain name of the Buyer App
-	BapID *string `json:"bap_id" validate:"required"`
-
-	// URI of the Buyer App for accepting callbacks. Must have the same domain name as the bap_id
-	BapURI *string `json:"bap_uri" validate:"required"`
-
-	// Unique id of the Seller App. By default it is the fully qualified domain name of the Seller App,
-	// mandatory for all peer-to-peer API requests, i.e. except search and on_search
-	BppID string `json:"bpp_id,omitempty"`
-
-	// URI of the Seller App. Must have the same domain name as the bap_id, mandatory for all
-	// peer-to-peer API requests, i.e. except search and on_search
-	BppURI string `json:"bpp_uri,omitempty"`
-
-	// This is a unique value which persists across all API calls from search through confirm
-	TransactionID *string `json:"transaction_id" validate:"required"`
-
-	// This is a unique value which persists during a request / callback cycle
-	MessageID *string `json:"message_id" validate:"required"`
-
-	// Time of request generation in RFC3339 format
-	Timestamp *time.Time `json:"timestamp" validate:"required"`
-
-	// The encryption public key of the sender
-	Key string `json:"key,omitempty"`
-
-	// Timestamp for which this message holds valid in ISO8601 durations format -
-	// Outer limit for TTL for search, select, init, confirm, status, track, cancel, update, rating, support is 'PT30S' which is 30 seconds,
-	// different buyer apps can change this to meet their UX requirements, but it shouldn't exceed this outer limit
-	TTL string `json:"ttl,omitempty"`
-}
-
-// Country - Describes a country.
+// Describes a country
 type Country struct {
 	// Name of the country
 	Name string `json:"name,omitempty"`
-
-	// Country code as per ISO 3166 Alpha-3 code format
+	// Country code as per ISO 3166-1 and ISO 3166-2 format
 	Code string `json:"code,omitempty"`
 }
 
-// Credential - Describes a credential of an entity - Person or Organization
-type Credential struct {
-	ID         string      `json:"id,omitempty"`
-	Type       string      `json:"type,omitempty"` // TODO: handle default value: VerifiableCredential
-	Descriptor *Descriptor `json:"descriptor,omitempty"`
-
-	// URL of the credential
-	URL string `json:"url,omitempty"`
-
-	Tags *TagGroup `json:"tags,omitempty"`
+// Describes a circular region of a specified radius centered at a specified GPS coordinate.
+type Circle struct {
+	Gps    string  `json:"gps,omitempty"`
+	Radius *Scalar `json:"radius,omitempty"`
 }
 
-// Descriptor - Describes the description of a real-world object.
-type Descriptor struct {
-	Name string `json:"name,omitempty"`
-
-	Code string `json:"code,omitempty"`
-
-	Symbol string `json:"symbol,omitempty"`
-
-	ShortDesc string `json:"short_desc,omitempty"`
-
-	LongDesc string `json:"long_desc,omitempty"`
-
-	Images []Image `json:"images,omitempty"`
-
-	Audio string `json:"audio,omitempty"`
-
-	Var3dRender string `json:"3d_render,omitempty"`
+// Describes a scalar
+type Scalar struct {
+	Type_          string       `json:"type,omitempty"`
+	Value          string       `json:"value,omitempty"`
+	EstimatedValue string       `json:"estimated_value,omitempty"`
+	ComputedValue  string       `json:"computed_value,omitempty"`
+	Range_         *ScalarRange `json:"range,omitempty"`
+	Unit           string       `json:"unit,omitempty"`
 }
 
-// Dimensions - Describes the dimensions of a real-world object
-type Dimensions struct {
-	Length *Scalar `json:"length,omitempty"`
-
-	Breadth *Scalar `json:"breadth,omitempty"`
-
-	Height *Scalar `json:"height,omitempty"`
+type ScalarRange struct {
+	Min string `json:"min,omitempty"`
+	Max string `json:"max,omitempty"`
 }
 
-// Document - Describes a document which can be sent as a URL
-type Document struct {
-	URL string `json:"url,omitempty"`
-
-	Label string `json:"label,omitempty"`
-}
-
-// Error - Describes an error object
-type Error struct {
-	Type string `json:"type" validate:"oneof=CONTEXT-ERROR CORE-ERROR DOMAIN-ERROR POLICY-ERROR JSON-SCHEMA-ERROR"`
-
-	// ONDC specific error code. For full list of error codes, refer to docs/drafts/Error Codes.md of this repo
-	Code *string `json:"code" validate:"required"`
-
-	// Path to json schema generating the error. Used only during json schema validation errors
-	Path string `json:"path,omitempty"`
-
-	// Human readable message describing the error
-	Message string `json:"message,omitempty"`
-}
-
-// Fee - A fee applied on a particular entity
-type Fee struct {
-	// Percentage of a value
-	Percentage *struct {
-		DecimalValue
-	} `json:"percentage,omitempty"`
-
-	// A fixed value
-	Amount *struct {
-		Price
-	} `json:"amount,omitempty"`
-}
-
-// FeedbackFormElement - An element in the feedback form. It can be a question or an answer to the question.
-type FeedbackFormElement struct {
-	ID string `json:"id,omitempty"`
-
-	ParentID string `json:"parent_id,omitempty"`
-
-	// Specifies the question to which the answer options will be contained in the child FeedbackFormElements
-	Question string `json:"question,omitempty"`
-
-	// Specifies an answer option to which the question will be in the FeedbackFormElement specified in parent_id
-	Answer string `json:"answer,omitempty"`
-
-	// Specifies how the answer option should be rendered.
-	AnswerType *string `json:"answer_type,omitempty" validate:"omitempty,oneof=radio checkbox text"`
-}
-
-// Feedback - Feedback for a service
-type Feedback struct {
-	FeedbackForm FeedbackForm `json:"feedback_form,omitempty"`
-
-	FeedbackURL *FeedbackURL `json:"feedback_url,omitempty"`
-}
-
-// FeedbackURL - Describes how a feedback URL will be sent by the Seller App
-type FeedbackURL struct {
-	// feedback URL sent by the Seller App
-	URL string `json:"url,omitempty"`
-
-	TlMethod *string `json:"tl_method,omitempty" validate:"omitempty,oneof=http/get http/post"`
-
-	Params *feedbackURLParams `json:"params,omitempty"`
-}
-
-type feedbackURLParams struct {
-	// This value will be placed in the the $feedback_id url param in case of http/get and in the requestBody http/post requests
-	FeedbackID *string `json:"feedback_id" validate:"required"`
-}
-
-// Form - Describes a form
-type Form struct {
-	// The URL from where the form can be fetched.
-	//
-	// The content fetched from the url must be processed as per the mime_type specified in this object.
-	// Once fetched, the rendering platform can choosed to render the form as-is as an embeddable element; or process it further to blend with the theme of the application.
-	// In case the interface is non-visual, the the render can process the form data and reproduce it as per the standard specified in the form.
-	URL string `json:"url,omitempty"`
-
-	// The form content string.
-	//
-	// This content will again follow the mime_type field for processing. Typically forms should be sent as an html string starting with <form></form> tags.
-	// The application must render this form after removing any css or javascript code if necessary.
-	// The `action` attribute in the form should have a url where the form needs to be submitted.
-	Data string `json:"data,omitempty"`
-
-	// This field indicates the nature and format of the form received by querying the url.
-	//
-	// MIME types are defined and standardized in IETF's RFC 6838.
-	MimeType string `json:"mime_type,omitempty"`
-}
-
-type fulfillmentCustomer struct {
-	Person *Person `json:"person,omitempty"`
-
-	Contact *Contact `json:"contact,omitempty"`
-}
-
-// FulfillmentEnd - Details on the end of fulfillment
-type FulfillmentEnd struct {
-	Location *Location `json:"location,omitempty"`
-
-	Time *Time `json:"time,omitempty"`
-
-	Instructions *Descriptor `json:"instructions,omitempty"`
-
-	Contact *Contact `json:"contact,omitempty"`
-
-	Person *Person `json:"person,omitempty"`
-
-	Authorization *Authorization `json:"authorization,omitempty"`
-}
-
-// Fulfillment - Describes how a single product/service will be rendered/fulfilled to the end customer
-type Fulfillment struct {
-	// Unique reference ID to the fulfillment of an order
-	ID string `json:"id,omitempty"`
-
-	// This describes the type of fulfillment
-	//
-	// "Pickup" - Buyer picks up from store by themselves or through their logistics provider
-	// "Delivery" - seller delivers to buyer
-	Type string `json:"type" validate:"oneof=Delivery Pickup 'Delivery and Pickup' 'Reverse QC'"`
-
-	// Fulfillment Category
-	ONDCOrgCategory string `json:"@ondc/org/category,omitempty"`
-
-	// Fulfillment turnaround time in ISO8601 durations format e.g. 'PT24H' indicates 24 hour TAT
-	ONDCOrgTAT string `json:"@ondc/org/TAT,omitempty"`
-
-	// ID of the provider
-	ProviderID string `json:"provider_id,omitempty"`
-
-	ONDCOrgProviderName string `json:"@ondc/org/provider_name,omitempty"`
-
-	// Rating value given to the object
-	Rating float32 `json:"rating,omitempty"`
-
-	State *State `json:"state,omitempty"`
-
-	// Indicates whether the fulfillment allows tracking
-	Tracking bool `json:"tracking,omitempty"`
-
-	Customer *fulfillmentCustomer `json:"customer,omitempty"`
-
-	Agent *Agent `json:"agent,omitempty"`
-
-	Person *Person `json:"person,omitempty"`
-
-	Contact *Contact `json:"contact,omitempty"`
-
-	Vehicle *Vehicle `json:"vehicle,omitempty"`
-
-	Start *FulfillmentStart `json:"start,omitempty"`
-
-	End *FulfillmentEnd `json:"end,omitempty"`
-
-	Rateable *Rateable `json:"rateable,omitempty"`
-
-	Tags *TagGroup `json:"tags,omitempty"`
-}
-
-// FulfillmentStart - Details on the start of fulfillment
-type FulfillmentStart struct {
-	Location *Location `json:"location,omitempty"`
-
-	Time *Time `json:"time,omitempty"`
-
-	Instructions *Descriptor `json:"instructions,omitempty"`
-
-	Contact *Contact `json:"contact,omitempty"`
-
-	Person *Person `json:"person,omitempty"`
-
-	Authorization *Authorization `json:"authorization,omitempty"`
-}
-
-// Intent - Intent of a user. Used for searching for services.
-//
-// Buyer App can set finder fee type in payment."@ondc/org/buyer_app_finder_fee_type"
-// and amount in "@ondc/org/buyer_app_finder_fee_amount"
+// The intent to buy or avail a product or a service. The BAP can declare the intent of the consumer containing <ul><li>What they want (A product, service, offer)</li><li>Who they want (A seller, service provider, agent etc)</li><li>Where they want it and where they want it from</li><li>When they want it (start and end time of fulfillment</li><li>How they want to pay for it</li></ul><br>This has properties like descriptor,provider,fulfillment,payment,category,offer,item,tags<br>This is typically used by the BAP to send the purpose of the user's search to the BPP. This will be used by the BPP to find products or services it offers that may match the user's intent.<br>For example, in Mobility, the mobility consumer declares a mobility intent. In this case, the mobility consumer declares information that describes various aspects of their journey like,<ul><li>Where would they like to begin their journey (intent.fulfillment.start.location)</li><li>Where would they like to end their journey (intent.fulfillment.end.location)</li><li>When would they like to begin their journey (intent.fulfillment.start.time)</li><li>When would they like to end their journey (intent.fulfillment.end.time)</li><li>Who is the transport service provider they would like to avail services from (intent.provider)</li><li>Who is traveling (This is not recommended in public networks) (intent.fulfillment.customer)</li><li>What kind of fare product would they like to purchase (intent.item)</li><li>What add-on services would they like to avail</li><li>What offers would they like to apply on their booking (intent.offer)</li><li>What category of services would they like to avail (intent.category)</li><li>What additional luggage are they carrying</li><li>How would they like to pay for their journey (intent.payment)</li></ul><br>For example, in health domain, a consumer declares the intent for a lab booking the describes various aspects of their booking like,<ul><li>Where would they like to get their scan/test done (intent.fulfillment.start.location)</li><li>When would they like to get their scan/test done (intent.fulfillment.start.time)</li><li>When would they like to get the results of their test/scan (intent.fulfillment.end.time)</li><li>Who is the service provider they would like to avail services from (intent.provider)</li><li>Who is getting the test/scan (intent.fulfillment.customer)</li><li>What kind of test/scan would they like to purchase (intent.item)</li><li>What category of services would they like to avail (intent.category)</li><li>How would they like to pay for their journey (intent.payment)</li></ul>
 type Intent struct {
+	// A raw description of the search intent. Free text search strings, raw audio, etc can be sent in this object.
 	Descriptor *Descriptor `json:"descriptor,omitempty"`
-
+	// The provider from which the customer wants to place to the order from
 	Provider *Provider `json:"provider,omitempty"`
-
+	// Details on how the customer wants their order fulfilled
 	Fulfillment *Fulfillment `json:"fulfillment,omitempty"`
-
+	// Details on how the customer wants to pay for the order
 	Payment *Payment `json:"payment,omitempty"`
-
+	// Details on the item category
 	Category *Category `json:"category,omitempty"`
-
+	// details on the offer the customer wants to avail
 	Offer *Offer `json:"offer,omitempty"`
-
-	Item *Item `json:"item,omitempty"`
-
-	Tags *TagGroup `json:"tags,omitempty"`
+	// Details of the item that the consumer wants to order
+	Item *Item      `json:"item,omitempty"`
+	Tags []TagGroup `json:"tags,omitempty"`
 }
 
-// Item - Describes a product or a service offered to the end consumer by the provider
-type Item struct {
-	// This is the most unique identifier of a service item. An example of an Item ID could be the SKU of a product.
-	ID string `json:"id,omitempty"`
-
-	// This is the most unique identifier of a service item. An example of an Item ID could be the SKU of a product.
-	ParentItemID string `json:"parent_item_id,omitempty"`
-
-	Descriptor *Descriptor `json:"descriptor,omitempty"`
-
-	Price *Price `json:"price,omitempty"`
-
-	// Unique id of the category
-	CategoryID string `json:"category_id,omitempty"`
-
-	// Categories this item can be listed under
-	CategoryIDs []string `json:"category_ids,omitempty"`
-
-	// Unique reference ID to the fulfillment of an order
-	FulfillmentID *string `json:"fulfillment_id,omitempty"`
-
-	// Rating value given to the object
-	Rating float32 `json:"rating,omitempty"`
-
-	LocationID string `json:"location_id,omitempty"`
-
-	Time *Time `json:"time,omitempty"`
-
-	Rateable *Rateable `json:"rateable,omitempty"`
-
-	Matched bool `json:"matched,omitempty"`
-
-	Related bool `json:"related,omitempty"`
-
-	Recommended bool `json:"recommended,omitempty"`
-
-	// whether the item is returnable
-	ONDCOrgReturnable bool `json:"@ondc/org/returnable,omitempty"`
-
-	// in case of return, whether the item should be picked up by seller
-	ONDCOrgSellerPickupReturn bool `json:"@ondc/org/seller_pickup_return,omitempty"`
-
-	// return window for the item in ISO8601 durations format e.g. 'PT24H' indicates 24 hour return window. Mandatory if \"@ondc/org/returnable\" is \"true\"
-	ONDCOrgReturnWindow string `json:"@ondc/org/return_window,omitempty"`
-
-	// whether the item is cancellable
-	ONDCOrgCancellable bool `json:"@ondc/org/cancellable,omitempty"`
-
-	// time from order confirmation by which item ready to ship in ISO8601 durations format (e.g. 'PT30M' indicates item ready to ship in 30 mins). Mandatory for category_id \"F&B\"
-	ONDCOrgTimeToShip string `json:"@ondc/org/time_to_ship,omitempty"`
-
-	// whether the catalog item is available on COD
-	ONDCOrgAvailableOnCOD bool `json:"@ondc/org/available_on_cod,omitempty"`
-
-	// contact details for consumer care
-	ONDCOrgContactDetailsConsumerCare string `json:"@ondc/org/contact_details_consumer_care,omitempty"`
-
-	// mandatory for category_id "Packaged Commodities"
-	ONDCOrgStatutoryReqsPackagedCommodities *struct {
-		// name of manufacturer or packer (in case manufacturer is not the packer) or name of importer for imported goods
-		ManufacturerOrPackerName string `json:"manufacturer_or_packer_name,omitempty"`
-
-		// address of manufacturer or packer (in case manufacturer is not the packer) or address of importer for imported goods
-		ManufacturerOrPackerAddress string `json:"manufacturer_or_packer_address,omitempty"`
-
-		// manufacturing license no
-		MfgLicenseNo string `json:"mfg_license_no,omitempty"`
-
-		// common or generic name of commodity
-		CommonOrGenericNameOfCommodity string `json:"common_or_generic_name_of_commodity,omitempty"`
-
-		// for packages with multiple products, the name and number of quantity of each (can be shown as \"name1-number_or_quantity; name2-number_or_quantity..\")
-		MultipleProductsNameNumberOrQty string `json:"multiple_products_name_number_or_qty,omitempty"`
-
-		// net quantity of commodity in terms of standard unit of weight or measure of commodity contained in package
-		NetQuantityOrMeasureOfCommodityInPkg string `json:"net_quantity_or_measure_of_commodity_in_pkg,omitempty"`
-
-		// month and year of manufacture or packing or import
-		MonthYearOfManufacturePackingImport string `json:"month_year_of_manufacture_packing_import,omitempty"`
-
-		// month and year of expiry
-		ExpiryDate string `json:"expiry_date,omitempty"`
-	} `json:"@ondc/org/statutory_reqs_packaged_commodities,omitempty"`
-
-	// mandatory for category_id "Packaged food"
-	ONDCOrgStatutoryReqsPrepackagedFood *struct {
-		// list of ingredients (except single ingredient foods), can be shown as ingredient (with percentage); ingredient (with percentage);..) e.g. \"Puffed Rice (40%); Split Green Gram (20%); Ground Nuts (20%);..\"
-		IngredientsInfo string `json:"ingredients_info,omitempty"`
-
-		// nutritional info (can be shown as nutritional info (with unit, per standard unit, per serving);..) e.g. \"Energy(KCal) - (per 100kg) 420, (per serving 50g) 250; Protein(g) - (per 100kg) 12, (per serving 50g)6;..\"
-		NutritionalInfo string `json:"nutritional_info,omitempty"`
-
-		// food additives together with specific name or recognized International Numbering System (can be shown as additive1-name or number;additive2-name or number;..)
-		AdditivesInfo string `json:"additives_info,omitempty"`
-
-		// name of manufacturer or packer (for non-retail containers)
-		ManufacturerOrPackerName string `json:"manufacturer_or_packer_name,omitempty"`
-
-		// address of manufacturer or packer (for non-retail containers)
-		ManufacturerOrPackerAddress string `json:"manufacturer_or_packer_address,omitempty"`
-
-		// name of brand owner
-		BrandOwnerName string `json:"brand_owner_name,omitempty"`
-
-		// address of brand owner
-		BrandOwnerAddress string `json:"brand_owner_address,omitempty"`
-
-		// FSSAI logo of brand owner (url based image e.g. uri:http://path/to/image)
-		BrandOwnerFSSAILogo string `json:"brand_owner_FSSAI_logo,omitempty"`
-
-		// FSSAI license no of brand owner
-		BrandOwnerFSSAILicenseNo string `json:"brand_owner_FSSAI_license_no,omitempty"`
-
-		// FSSAI license no of manufacturer or marketer or packer or bottler if different from brand owner
-		OtherFSSAILicenseNo string `json:"other_FSSAI_license_no,omitempty"`
-
-		// net quantity
-		NetQuantity string `json:"net_quantity,omitempty"`
-
-		// name of importer
-		ImporterName string `json:"importer_name,omitempty"`
-
-		// address of importer
-		ImporterAddress string `json:"importer_address,omitempty"`
-
-		// FSSAI logo of importer (url based image e.g. uri:http://path/to/image)
-		ImporterFSSAILogo string `json:"importer_FSSAI_logo,omitempty"`
-
-		// FSSAI license no of importer
-		ImporterFSSAILicenseNo string `json:"importer_FSSAI_license_no,omitempty"`
-
-		// country of origin for imported products (ISO 3166 Alpha-3 code format)
-		ImportedProductCountryOfOrigin string `json:"imported_product_country_of_origin,omitempty"`
-
-		// name of importer for product manufactured outside but packaged or bottled in India
-		OtherImporterName string `json:"other_importer_name,omitempty"`
-
-		// address of importer for product manufactured outside but packaged or bottled in India
-		OtherImporterAddress string `json:"other_importer_address,omitempty"`
-
-		// premises where product manufactured outside are packaged or bottled in India
-		OtherPremises string `json:"other_premises,omitempty"`
-	} `json:"@ondc/org/statutory_reqs_prepackaged_food,omitempty"`
-
-	Tags *TagGroup `json:"tags,omitempty"`
-}
-
-// ItemQuantity - Describes count or amount of an item
-type ItemQuantity struct {
-	Allocated *itemQuantityInner `json:"allocated,omitempty"`
-
-	Available *itemQuantityInner `json:"available,omitempty"`
-
-	Maximum *itemQuantityMaximum `json:"maximum,omitempty"`
-
-	Minimum *itemQuantityInner `json:"minimum,omitempty"`
-
-	Selected *itemQuantityInner `json:"selected,omitempty"`
-
-	Unitized *itemQuantityInner `json:"unitized,omitempty"`
-}
-
-type itemQuantityInner struct {
-	Count int32 `json:"count,omitempty"`
-
-	Measure *Scalar `json:"measure,omitempty"`
-}
-
-type itemQuantityMaximum struct {
-	Count int32 `json:"count,omitempty"`
-
-	Measure *Scalar `json:"measure,omitempty"`
-}
-
-// Language - indicates language code. ONDC supports language codes as per ISO 639.2 standard
-type Language struct {
-	Code string `json:"code,omitempty"`
-}
-
-// Location - Describes the location of a runtime object.
-type Location struct {
-	ID string `json:"id,omitempty"`
-
-	Descriptor *Descriptor `json:"descriptor,omitempty"`
-
-	Gps *GPS `json:"gps,omitempty"`
-
-	Address *Address `json:"address,omitempty"`
-
-	StationCode string `json:"station_code,omitempty"`
-
-	City *City `json:"city,omitempty"`
-
-	Country *Country `json:"country,omitempty"`
-
-	Circle *Circle `json:"circle,omitempty"`
-
-	Polygon string `json:"polygon,omitempty"`
-
-	Var3dspace string `json:"3dspace,omitempty"`
-
-	Time *Time `json:"time,omitempty"`
-}
-
-// MediaFile - This object contains a url to a media file.
-type MediaFile struct {
-	// indicates the nature and format of the document, file, or assortment of bytes. MIME types are defined and standardized in IETF's RFC 6838
-	MimeType string `json:"mimetype,omitempty"`
-
-	// The URL of the file
-	URL string `json:"url,omitempty"`
-
-	// The digital signature of the file signed by the sender
-	Signature string `json:"signature,omitempty"`
-
-	// The signing algorithm used by the sender
-	DSA string `json:"dsa,omitempty"`
-}
-
-// Offer - Describes an offer
-type Offer struct {
-	ID string `json:"id,omitempty"`
-
-	Descriptor *Descriptor `json:"descriptor,omitempty"`
-
-	LocationIds []string `json:"location_ids,omitempty"`
-
-	CategoryIds []string `json:"category_ids,omitempty"`
-
-	ItemIds []string `json:"item_ids,omitempty"`
-
-	Time *Time `json:"time,omitempty"`
-
-	Tags *TagGroup `json:"tags,omitempty"`
-}
-
-type operatorAllOfExperience struct {
-	Label string `json:"label,omitempty"`
-
-	Value string `json:"value,omitempty"`
-
-	Unit string `json:"unit,omitempty"`
-}
-
-type operatorAllOf struct {
-	Experience *operatorAllOfExperience `json:"experience,omitempty"`
-}
-
-// Operator - Describes the agent of a service
-type Operator struct {
-	// Describes the name of a person in format: ./{given_name}/{honorific_prefix}/{first_name}/{middle_name}/{last_name}/{honorific_suffix}
-	Name string `json:"name,omitempty"`
-
-	// Image of an object. <br/><br/> A url based image will look like <br/><br/>```uri:http://path/to/image``` <br/><br/> An image can also be sent as a data string. For example : <br/><br/> ```data:js87y34ilhriuho84r3i4```
-	Image string `json:"image,omitempty"`
-
-	Dob string `json:"dob,omitempty"`
-
-	// Gender of something, typically a Person, but possibly also fictional characters, animals, etc. While Male and Female may be used, text strings are also acceptable for people who do not identify as a binary gender
-	Gender string `json:"gender,omitempty"`
-
-	Cred string `json:"cred,omitempty"`
-
-	// Describes a tag. This is a simple key-value store which is used to contain extended metadata
-	Tags map[string]string `json:"tags,omitempty"`
-
-	Experience *operatorAllOfExperience `json:"experience,omitempty"`
-}
-
-// Option - Describes a selectable option
-type Option struct {
-	ID string `json:"id,omitempty"`
-
-	Descriptor *Descriptor `json:"descriptor,omitempty"`
-}
-
-type orderAddOnsInner struct {
-	// ID of the add-on. This follows the syntax {item.id}/add-on/{add-on unique id} for item specific add-on OR
-	ID string `json:"id,omitempty"`
-}
-
-// Order - Describes the details of an order
-type Order struct {
-	// Unique identifier for Order across the network
-	ID string `json:"id,omitempty"`
-
-	State string `json:"state,omitempty"`
-
-	Provider *orderProvider `json:"provider,omitempty"`
-
-	Items []orderItemsInner `json:"items,omitempty"`
-
-	AddOns []orderAddOnsInner `json:"add_ons,omitempty"`
-
-	Offers []orderProviderLocationsInner `json:"offers,omitempty"`
-
-	Documents []Document `json:"documents,omitempty"`
-
-	Billing *Billing `json:"billing,omitempty"`
-
-	Fulfillments []Fulfillment `json:"fulfillments,omitempty"`
-
-	// The cancellation terms of this order. This can be overriden at the item level cancellation terms.
-	CancellationTerms []CancellationTerm `json:"cancellation_terms,omitempty"`
-
-	Quote *Quotation `json:"quote,omitempty"`
-
-	Payment *Payment `json:"payment,omitempty"`
-
-	CreatedAt time.Time `json:"created_at,omitempty"`
-
-	UpdatedAt time.Time `json:"updated_at,omitempty"`
-}
-
-type orderItemsInner struct {
-	// This is the most unique identifier of a service item. An example of an Item ID could be the SKU of a product.
-	ID string `json:"id,omitempty"`
-
-	Quantity *struct {
-		Count   int32   `json:"count,omitempty"`
-		Measure *Scalar `json:"measure,omitempty"`
-	} `json:"quantity,omitempty"`
-}
-
-type orderProvider struct {
-	// ID of the provider
-	ID string `json:"id,omitempty"`
-
-	Locations []orderProviderLocationsInner `json:"locations,omitempty"`
-}
-
-type orderProviderLocationsInner struct {
-	ID string `json:"id,omitempty"`
-}
-
-// Organization - Describes an organization
-type Organization struct {
-	Name string `json:"name,omitempty"`
-
-	Cred string `json:"cred,omitempty"`
-}
-
-// Page - Describes a page in a search result
-type Page struct {
-	ID string `json:"id,omitempty"`
-
-	NextID string `json:"next_id,omitempty"`
-}
-
-// Payment - Describes a payment
-type Payment struct {
-	// A payment uri to be called by the Buyer App. If empty, then the payment is to be done offline. The details of payment should be present in the params object. If ```tl_method``` = http/get, then the payment details will be sent as url params. Two url param values, ```$transaction_id``` and ```$amount``` are mandatory. And example url would be : https://www.example.com/pay?txid=$transaction_id&amount=$amount&vpa=upiid&payee=shopez&billno=1234
-	URI string `json:"uri,omitempty"`
-
-	TlMethod *string `json:"tl_method,omitempty" validate:"omitempty,oneof=http/get http/post payto upi"`
-
-	Params *paymentParams `json:"params,omitempty"`
-
-	Type *string `json:"type,omitempty" validate:"omitempty,oneof=ON-ORDER PRE-FULFILLMENT ON-FULFILLMENT POST-FULFILLMENT"`
-
-	Status *string `json:"status,omitempty" validate:"omitempty,oneof=PAID NOT-PAID"`
-
-	Time *Time `json:"time,omitempty"`
-
-	CollectedBy *string `json:"collected_by,omitempty" validate:"omitempty,oneof=BAP BPP"`
-
-	ONDCOrgCollectedByStatus *string `json:"@ondc/org/collected_by_status,omitempty" validate:"omitempty,oneof=Assert Agree Disagree Terminate"`
-
-	// NOTE: valid values from swagger are `Amount` and `Percent` but valid values from API contract are `amount` and `percent`.
-	// So we support both form.
-	ONDCOrgBuyerAppFinderFeeType *string `json:"@ondc/org/buyer_app_finder_fee_type,omitempty" validate:"omitempty,oneof=Amount Percent amount percent"`
-
-	ONDCOrgBuyerAppFinderFeeAmount *DecimalValue `json:"@ondc/org/buyer_app_finder_fee_amount,omitempty"`
-
-	ONDCOrgWithholdingAmount *DecimalValue `json:"@ondc/org/withholding_amount,omitempty"`
-
-	ONDCOrgWithholdingAmountStatus *string `json:"@ondc/org/withholding_amount_status,omitempty" validate:"omitempty,oneof=Assert Agree Disagree Terminate"`
-
-	// return window for withholding amount in ISO8601 durations format e.g. 'PT24H' indicates 24 hour return window
-	ONDCOrgReturnWindow string `json:"@ondc/org/return_window,omitempty"`
-
-	ONDCOrgReturnWindowStatus *string `json:"@ondc/org/return_window_status,omitempty" validate:"omitempty,oneof=Assert Agree Disagree Terminate"`
-
-	// In case of prepaid payment, whether settlement between counterparties should be on the basis of collection, shipment or delivery
-	ONDCOrgSettlementBasis *string `json:"@ondc/org/settlement_basis,omitempty" validate:"omitempty,oneof=shipment delivery return_window_expiry"`
-
-	ONDCOrgSettlementBasisStatus *string `json:"@ondc/org/settlement_basis_status,omitempty" validate:"omitempty,oneof=Assert Agree Disagree Terminate"`
-
-	// settlement window for the counterparty in ISO8601 durations format e.g. 'PT48H' indicates T+2 settlement
-	ONDCOrgSettlementWindow string `json:"@ondc/org/settlement_window,omitempty"`
-
-	ONDCOrgSettlementWindowStatus *string `json:"@ondc/org/settlement_window_status,omitempty" validate:"omitempty,oneof=Assert Agree Disagree Terminate"`
-
-	ONDCOrgSettlementDetails []struct {
-		SettlementCounterparty  *string   `json:"settlement_counterparty,omitempty" validate:"omitempty,oneof=buyer buyer-app seller-app logistics-provider"`
-		SettlementPhase         *string   `json:"settlement_phase,omitempty" validate:"omitempty,oneof=sale-amount withholding-amount refund"`
-		SettlementAmount        int       `json:"settlement_amount,omitempty"`
-		SettlementType          *string   `json:"settlement_type,omitempty" validate:"omitempty,oneof=neft rtgs upi credit"`
-		SettlementBankAccountNo string    `json:"settlement_bank_account_no,omitempty"`
-		SettlementIFSCCode      string    `json:"settlement_ifsc_code,omitempty"`
-		UPIAddress              string    `json:"upi_address,omitempty"`         // UPI payment address e.g. VPA
-		BankName                string    `json:"bank_name,omitempty"`           // Bank name
-		BranchName              string    `json:"branch_name,omitempty"`         // Branch name
-		BeneficiaryName         string    `json:"beneficiary_name,omitempty"`    // Beneficiary Name
-		BeneficiaryAddress      string    `json:"beneficiary_address,omitempty"` // Beneficiary Address
-		SettlementStatus        *string   `json:"settlement_status,omitempty" validate:"omitempty,oneof=PAID NOT-PAID"`
-		SettlementReference     string    `json:"settlement_reference,omitempty"` // Settlement transaction reference number
-		SettlementTimestamp     time.Time `json:"settlement_timestamp,omitempty"` // Settlement transaction timestamp
-	} `json:"@ondc/org/settlement_details,omitempty"`
-}
-
-type paymentParams struct {
-	// This value will be placed in the the $transaction_id url param in case of http/get and in the requestBody http/post requests
-	TransactionID string `json:"transaction_id,omitempty"`
-
-	TransactionStatus string `json:"transaction_status,omitempty"`
-
-	// Describes a decimal value
-	Amount string `json:"amount,omitempty"`
-
-	// ISO 4217 alphabetic currency code e.g. 'INR'
-	Currency *string `json:"currency" validate:"required"`
-}
-
-// Person - Describes a person.
-type Person struct {
-	Name *Name `json:"name,omitempty"`
-
-	Image *Image `json:"image,omitempty"`
-
-	Dob string `json:"dob,omitempty"`
-
-	// Gender of something, typically a Person, but possibly also fictional characters, animals, etc. While Male and Female may be used, text strings are also acceptable for people who do not identify as a binary gender
-	Gender string `json:"gender,omitempty"`
-
-	Tags *TagGroup `json:"tags,omitempty"`
-}
-
-// Policy - Describes a policy. Allows for domain extension.
-type Policy struct {
-	ID string `json:"id,omitempty"`
-
-	Descriptor *Descriptor `json:"descriptor,omitempty"`
-
-	ParentPolicyID string `json:"parent_policy_id,omitempty"`
-
-	Time *Time `json:"time,omitempty"`
-}
-
-// Price - Describes the price of an item. Allows for domain extension.
-type Price struct {
-	// ISO 4217 alphabetic currency code e.g. 'INR'
-	Currency string `json:"currency,omitempty"`
-
-	Value          *DecimalValue `json:"value,omitempty"`
-	EstimatedValue *DecimalValue `json:"estimated_value,omitempty"`
-	ComputedValue  *DecimalValue `json:"computed_value,omitempty"`
-	ListedValue    *DecimalValue `json:"listed_value,omitempty"`
-	OfferedValue   *DecimalValue `json:"offered_value,omitempty"`
-	MinimumValue   *DecimalValue `json:"minimum_value,omitempty"`
-	MaximumValue   *DecimalValue `json:"maximum_value,omitempty"`
-}
-
-// Provider - Describes a service provider. This can be a restaurant, a hospital, a Store etc
+// Describes the catalog of a business.
 type Provider struct {
-	// ID of the provider
-	ID string `json:"id,omitempty"`
-
+	// Id of the provider
+	Id         string      `json:"id,omitempty"`
 	Descriptor *Descriptor `json:"descriptor,omitempty"`
-
-	// Category ID of the provider
-	CategoryID string `json:"category_id,omitempty"`
-
-	// FSSAI license no. Mandatory for category_id \"F&B\"
-	ONDCOrgFSSAILicenseNo string `json:"@ondc/org/fssai_license_no,omitempty"`
-
-	// Rating value given to the object
-	Rating float32 `json:"rating,omitempty"`
-
-	Time *Time `json:"time,omitempty"`
-
-	Categories []Category `json:"categories,omitempty"`
-
-	Cred []Credential `json:"creds,omitempty"`
-
+	// Category Id of the provider at the BPP-level catalog
+	CategoryId   string        `json:"category_id,omitempty"`
+	Rating       string        `json:"rating,omitempty"`
+	Time         *Time         `json:"time,omitempty"`
+	Categories   []Category    `json:"categories,omitempty"`
 	Fulfillments []Fulfillment `json:"fulfillments,omitempty"`
-
-	Payments []Payment `json:"payments,omitempty"`
-
-	Locations []providerLocationsInner `json:"locations,omitempty"`
-
-	Offers []Offer `json:"offers,omitempty"`
-
-	Items []Item `json:"items,omitempty"`
-
-	// Validity of catalog in ISO8601 durations format after which it has to be refreshed
-	//
-	// e.g. 'P7D' indicates validity of 7 days; value of 0 indicates catalog is not cacheable
-	TTL string `json:"ttl,omitempty"`
-
+	Payments     []Payment     `json:"payments,omitempty"`
+	Locations    []Location    `json:"locations,omitempty"`
+	Offers       []Offer       `json:"offers,omitempty"`
+	Items        []Item        `json:"items,omitempty"`
 	// Time after which catalog has to be refreshed
 	Exp time.Time `json:"exp,omitempty"`
-
-	Rateable *Rateable `json:"rateable,omitempty"`
-
-	Tags *TagGroup `json:"tags,omitempty"`
+	// Whether this provider can be rated or not
+	Rateable bool `json:"rateable,omitempty"`
+	// The time-to-live in seconds, for this object. This can be overriden at deeper levels. A value of -1 indicates that this object is not cacheable.
+	Ttl  string     `json:"ttl,omitempty"`
+	Tags []TagGroup `json:"tags,omitempty"`
 }
 
-type providerLocationsInner struct {
-	ID string `json:"id,omitempty"`
-
-	Descriptor *Descriptor `json:"descriptor,omitempty"`
-
-	// Describes a gps coordinate
-	Gps string `json:"gps,omitempty"`
-
-	Address *Address `json:"address,omitempty"`
-
-	StationCode string `json:"station_code,omitempty"`
-
-	City *City `json:"city,omitempty"`
-
-	Country *Country `json:"country,omitempty"`
-
-	Circle *Circle `json:"circle,omitempty"`
-
-	Polygon string `json:"polygon,omitempty"`
-
-	Var3dspace string `json:"3dspace,omitempty"`
-
-	Time *Time `json:"time,omitempty"`
-
-	Rateable *Rateable `json:"rateable,omitempty"`
+// Describes time in its various forms. It can be a single point in time; duration; or a structured timetable of operations<br>This has properties like label, time stamp,duration,range, days, schedule
+type Time struct {
+	Label     string     `json:"label,omitempty"`
+	Timestamp time.Time  `json:"timestamp,omitempty"`
+	Duration  string     `json:"duration,omitempty"`
+	Range_    *TimeRange `json:"range,omitempty"`
+	// comma separated values representing days of the week
+	Days     string    `json:"days,omitempty"`
+	Schedule *Schedule `json:"schedule,omitempty"`
+}
+type TimeRange struct {
+	Start time.Time `json:"start,omitempty"`
+	End   time.Time `json:"end,omitempty"`
 }
 
-type quotationBreakupInner struct {
-	// This is the most unique identifier of a service item. An example of an Item ID could be the SKU of a product.
-	ONDCOrgItemID string `json:"@ondc/org/item_id,omitempty"`
-
-	ONDCOrgItemQuantity *itemQuantityInner `json:"@ondc/org/item_quantity,omitempty"`
-
-	ONDCOrgTitleType *string `json:"@ondc/org/title_type,omitempty" validate:"omitempty,oneof=item delivery packing tax misc discount"`
-
-	Item *Item `json:"item,omitempty"`
-
-	Title string `json:"title,omitempty"`
-
-	Price *Price `json:"price,omitempty"`
-}
-
-// Quotation - Describes a quote
-type Quotation struct {
-	Price *Price `json:"price,omitempty"`
-
-	Breakup []quotationBreakupInner `json:"breakup,omitempty"`
-
-	TTL *Duration `json:"ttl,omitempty"`
-}
-
-type ratingAck struct {
-	// If feedback has been recorded or not
-	FeedbackAck bool `json:"feedback_ack,omitempty"`
-
-	// If rating has been recorded or not
-	RatingAck bool `json:"rating_ack,omitempty"`
-}
-
-// Rating - Describes the rating of a person or an object.
-type Rating struct {
-	// Category of the object being rated
-	RatingCategory string `json:"rating_category,omitempty"`
-
-	// ID of the object being rated
-	ID string `json:"id,omitempty"`
-
-	// Rating value given to the object (1 - Poor; 2 - Needs improvement; 3 - Satisfactory; 4 - Good; 5 - Excellent)
-	Value float32 `json:"value,omitempty" validate:"min=1,max=5"`
-
-	FeedbackForm FeedbackForm `json:"feedback_form,omitempty"`
-
-	// This value will be placed in the the $feedback_id url param in case of http/get and in the requestBody http/post requests
-	FeedbackID string `json:"feedback_id,omitempty"`
-}
-
-// Scalar - An object representing a scalar quantity.
-type Scalar struct {
-	Type *string `json:"type,omitempty" validate:"omitempty,oneof=CONSTANT VARIABLE"`
-
-	Value *float32 `json:"value" validate:"required"`
-
-	EstimatedValue float32 `json:"estimated_value,omitempty"`
-
-	ComputedValue float32 `json:"computed_value,omitempty"`
-
-	Range *scalarRange `json:"range,omitempty"`
-
-	Unit *string `json:"unit" validate:"required"`
-}
-
-type scalarRange struct {
-	Min float32 `json:"min,omitempty"`
-
-	Max float32 `json:"max,omitempty"`
-}
-
-// Schedule - Describes a schedule
+// Describes schedule as a repeating time period used to describe a regularly recurring event. At a minimum a schedule will specify frequency which describes the interval between occurrences of the event. Additional information can be provided to specify the schedule more precisely. This includes identifying the timestamps(s) of when the event will take place. Schedules may also have holidays to exclude a specific day from the schedule.<br>This has properties like frequency, holidays, times
 type Schedule struct {
-	Frequency *Duration `json:"frequency,omitempty"`
-
-	Holidays []string `json:"holidays,omitempty"`
-
-	Times []string `json:"times,omitempty"`
+	Frequency string      `json:"frequency,omitempty"`
+	Holidays  []time.Time `json:"holidays,omitempty"`
+	Times     []time.Time `json:"times,omitempty"`
 }
 
-// State - Describes a state
-type State struct {
+// A label under which a collection of items can be grouped.
+type Category struct {
+	// ID of the category
+	Id               string      `json:"id,omitempty"`
+	ParentCategoryId string      `json:"parent_category_id,omitempty"`
+	Descriptor       *Descriptor `json:"descriptor,omitempty"`
+	Time             *Time       `json:"time,omitempty"`
+	// Time to live for an instance of this schema
+	Ttl  string     `json:"ttl,omitempty"`
+	Tags []TagGroup `json:"tags,omitempty"`
+}
+
+// A collection of tag objects with group level attributes. For detailed documentation on the Tags and Tag Groups schema go to https://github.com/beckn/protocol-specifications/discussions/316
+type TagGroup struct {
+	// Indicates the display properties of the tag group. If display is set to false, then the group will not be displayed. If it is set to true, it should be displayed. However, group-level display properties can be overriden by individual tag-level display property. As this schema is purely for catalog display purposes, it is not recommended to send this value during search.
+	Display bool `json:"display,omitempty"`
+	// Description of the TagGroup, can be used to store detailed information.
+	Descriptor *TagDescriptor `json:"descriptor,omitempty"`
+	// An array of Tag objects listed under this group. This property can be set by BAPs during search to narrow the `search` and achieve more relevant results. When received during `on_search`, BAPs must render this list under the heading described by the `name` property of this schema.
+	List []Tag `json:"list,omitempty"`
+}
+
+// Description of the Tag, can be used to store detailed information.
+type TagDescriptor struct {
+	Name           string                    `json:"name,omitempty"`
+	Code           string                    `json:"code,omitempty"`
+	ShortDesc      string                    `json:"short_desc,omitempty"`
+	LongDesc       string                    `json:"long_desc,omitempty"`
+	AdditionalDesc *DescriptorAdditionalDesc `json:"additional_desc,omitempty"`
+	Media          []MediaFile               `json:"media,omitempty"`
+	Images         []Image                   `json:"images,omitempty"`
+}
+
+// Describes a tag. This is used to contain extended metadata. This object can be added as a property to any schema to describe extended attributes. For BAPs, tags can be sent during search to optimize and filter search results. BPPs can use tags to index their catalog to allow better search functionality. Tags are sent by the BPP as part of the catalog response in the `on_search` callback. Tags are also meant for display purposes. Upon receiving a tag, BAPs are meant to render them as name-value pairs. This is particularly useful when rendering tabular information about a product or service.
+type Tag struct {
+	// Description of the Tag, can be used to store detailed information.
+	Descriptor *TagDescriptor `json:"descriptor,omitempty"`
+	// The value of the tag. This set by the BPP and rendered as-is by the BAP.
+	Value string `json:"value,omitempty"`
+	// This value indicates if the tag is intended for display purposes. If set to `true`, then this tag must be displayed. If it is set to `false`, it should not be displayed. This value can override the group display value.
+	Display bool `json:"display,omitempty"`
+}
+
+// Describes how a an order will be rendered/fulfilled to the end-customer
+type Fulfillment struct {
+	// Unique reference ID to the fulfillment of an order
+	Id string `json:"id,omitempty"`
+	// A code that describes the mode of fulfillment. This is typically set when there are multiple ways an order can be fulfilled. For example, a retail order can be fulfilled either via store pickup or a home delivery. Similarly, a medical consultation can be provided either in-person or via tele-consultation. The network policy must publish standard fulfillment type codes for the different modes of fulfillment.
+	Type_ string `json:"type,omitempty"`
+	// Whether the fulfillment can be rated or not
+	Rateable bool `json:"rateable,omitempty"`
+	// The rating value of the fulfullment service.
+	Rating string `json:"rating,omitempty"`
+	// The current state of fulfillment. The BPP must set this value whenever the state of the order fulfillment changes and fire an unsolicited `on_status` call.
+	State *FulfillmentState `json:"state,omitempty"`
+	// Indicates whether the fulfillment allows tracking
+	Tracking bool `json:"tracking,omitempty"`
+	// The person that will ultimately receive the order
+	Customer *FulfillmentCustomer `json:"customer,omitempty"`
+	// The agent that is currently handling the fulfillment of the order
+	Agent   *Agent   `json:"agent,omitempty"`
+	Contact *Contact `json:"contact,omitempty"`
+	Vehicle *Vehicle `json:"vehicle,omitempty"`
+	// The list of logical stops encountered during the fulfillment of an order.
+	Stops []Stop `json:"stops,omitempty"`
+	// The physical path taken by the agent that can be rendered on a map. The allowed format of this property can be set by the network.
+	Path string     `json:"path,omitempty"`
+	Tags []TagGroup `json:"tags,omitempty"`
+}
+
+// The current state of fulfillment. The BPP must set this value whenever the state of the order fulfillment changes and fire an unsolicited `on_status` call.
+type FulfillmentState struct {
 	Descriptor *Descriptor `json:"descriptor,omitempty"`
-
-	UpdatedAt time.Time `json:"updated_at,omitempty"`
-
+	UpdatedAt  time.Time   `json:"updated_at,omitempty"`
 	// ID of entity which changed the state
 	UpdatedBy string `json:"updated_by,omitempty"`
 }
 
-// Subscriber - Any entity which wants to authenticate itself on a network. This can be a Buyer App, Seller App or Gateway.
-type Subscriber struct {
-	// Registered domain name of the subscriber. Must have a valid SSL certificate issued by a Certificate Authority of the operating region
-	SubscriberID string `json:"subscriber_id,omitempty"`
-
-	Type *string `json:"type,omitempty" validate:"omitempty,oneof=bap bpp bg"`
-
-	// Callback URL of the subscriber. The Registry will call this URL's on_subscribe API to validate the subscriber\\'s credentials
-	CbURL string `json:"cb_url,omitempty"`
-
-	Domain *Domain `json:"domain,omitempty"`
-
-	// Codification of city code will be using the std code of the city e.g. for Bengaluru, city code is 'std:080'
-	City string `json:"city,omitempty"`
-
-	// Country code as per ISO 3166 Alpha-3 code format
-	Country string `json:"country,omitempty"`
-
-	// Signing Public key of the subscriber. <br/><br/>Any subscriber platform (Buyer App, Seller App, Gateway) who wants to transact on the network must digitally sign the ```requestBody``` using the corresponding private key of this public key and send it in the transport layer header. In case of ```HTTP``` it is the ```Authorization``` header. <br><br/>The ```Authorization``` will be used to validate the signature of a Buyer App or Seller App.<br/><br/>Furthermore, if an API call is being proxied or multicast by a ONDC Gateway, the Gateway must use it\\'s signing key to digitally sign the ```requestBody``` using the corresponding private key of this public key and send it in the ```X-Gateway-Authorization``` header.
-	SigningPublicKey string `json:"signing_public_key,omitempty"`
-
-	// Encryption public key of the Buyer App. Any Seller App must encrypt the ```requestBody.message``` value of the ```on_search``` API using this public key.
-	EncryptionPublicKey string `json:"encryption_public_key,omitempty"`
-
-	Status *string `json:"status,omitempty" validate:"omitempty,oneof=INITIATED UNDER_SUBSCRIPTION SUBSCRIBED INVALID_SSL UNSUBSCRIBED"`
-
-	// Timestamp when a subscriber was added to the registry with status = INITIATED
-	Created time.Time `json:"created,omitempty"`
-
-	Updated time.Time `json:"updated,omitempty"`
-
-	// Expiry timestamp in UTC derived from the ```lease_time``` of the subscriber
-	Expires time.Time `json:"expires,omitempty"`
+// The person that will ultimately receive the order
+type FulfillmentCustomer struct {
+	Organization *Organization `json:"organization,omitempty"`
+	Person       *Person       `json:"person,omitempty"`
+	Contact      *Contact      `json:"contact,omitempty"`
 }
 
-// Support - Customer support
-type Support struct {
-	Type *string `json:"type,omitempty" validate:"omitempty,oneof=order billing fulfillment"`
-
-	RefID string `json:"ref_id,omitempty"`
-
-	Channels *TagGroup `json:"channels,omitempty"`
+// An organization. Usually a recognized business entity.
+type Organization struct {
+	Descriptor *Descriptor `json:"descriptor,omitempty"`
+	// The postal address of the organization
+	Address string `json:"address,omitempty"`
+	// The state where the organization's address is registered
+	State *State `json:"state,omitempty"`
+	// The city where the the organization's address is registered
+	City    *City        `json:"city,omitempty"`
+	Contact *Contact     `json:"contact,omitempty"`
+	Creds   []Credential `json:"creds,omitempty"`
 }
 
-// Tag - Describes a tag.
-//
-// This is a simple key-value store which is used to contain extended metadata.
-// This object can be added as a property to any schema to describe extended attributes.
-// For BAPs, tags can be sent during search to optimize and filter search results.
-// BPPs can use tags to index their catalog to allow better search functionality.
-// Tags are sent by the BPP as part of the catalog response in the `on_search` callback.
-// Tags are also meant for display purposes. Upon receiving a tag, BAPs are meant to render them as name-value pairs.
-// This is particularly useful when rendering tabular information about a product or service.
-type Tag struct {
-	// The machine-readable name of the tag.
-	//
-	// The allowed values of this property can be published at three levels namely,
-	// a) Core specification,
-	// b) industry sector-specific adaptations, and
-	// c) Network-specific adaptations.
-	// Except core, each adaptation (sector or network) should prefix a unique namespace with the allowed value.
+// Describes a person as any individual
+type Person struct {
+	// Describes the identity of the person
+	Id string `json:"id,omitempty"`
+	// Profile url of the person
+	Url string `json:"url,omitempty"`
+	// the name of the person
+	Name  string `json:"name,omitempty"`
+	Image *Image `json:"image,omitempty"`
+	// Age of the person
+	Age string `json:"age,omitempty"`
+	// Date of birth of the person
+	Dob string `json:"dob,omitempty"`
+	// Gender of something, typically a Person, but possibly also fictional characters, animals, etc. While Male and Female may be used, text strings are also acceptable for people who do not identify as a binary gender.Allowed values for this field can be published in the network policy
+	Gender    string            `json:"gender,omitempty"`
+	Creds     []Credential      `json:"creds,omitempty"`
+	Languages []PersonLanguages `json:"languages,omitempty"`
+	Skills    []PersonSkills    `json:"skills,omitempty"`
+	Tags      []TagGroup        `json:"tags,omitempty"`
+}
+
+// Describes the contact information of an entity
+type Contact struct {
+	Phone string `json:"phone,omitempty"`
+	Email string `json:"email,omitempty"`
+	// A Jcard object as per draft-ietf-jcardcal-jcard-03 specification
+	Jcard *interface{} `json:"jcard,omitempty"`
+}
+
+// Describes a credential of an entity - Person or Organization
+type Credential struct {
+	Id    string `json:"id,omitempty"`
+	Type_ string `json:"type,omitempty"`
+	// URL of the credential
+	Url string `json:"url,omitempty"`
+}
+
+// Describes a language known to the person.
+type PersonLanguages struct {
 	Code string `json:"code,omitempty"`
-
-	// The human-readable name of the tag. This set by the BPP and rendered as-is by the BAP.
-	//
-	// Sometimes, the network policy may reserve some names for this property. Values outside the reserved values can be set by the BPP.
-	// However,the BAP may choose to rename or even ignore this value and render the output purely using the `code` property,
-	// but it is recommended for BAPs to keep the name same to avoid confusion and provide consistency.
 	Name string `json:"name,omitempty"`
-
-	// The value of the tag. This set by the BPP and rendered as-is by the BAP.
-	Value string `json:"value,omitempty"`
-
-	// This value indicates if the tag is intended for display purposes.
-	//
-	// If set to `true`, then this tag must be displayed.
-	// If it is set to `false`, it should not be displayed.
-	// This value can override the group display value.
-	Display bool `json:"display,omitempty"`
 }
 
-// TagGroup - A collection of tag objects with group level attributes.
-//
-// For detailed documentation on the Tags and Tag Groups schema go to https://github.com/beckn/protocol-specifications/discussions/316
-type TagGroup struct {
-	// Indicates the display properties of the tag group.
-	//
-	// If display is set to false, then the group will not be displayed.
-	// If it is set to true, it should be displayed.
-	// However, group-level display properties can be overriden by individual tag-level display property.
-	// As this schema is purely for catalog display purposes, it is not recommended to send this value during search.
-	Display bool `json:"display,omitempty"` // TODO: handle default value: true
-
-	// The machine-readable name of the tag group.
-	//
-	// The allowed values of this property can be published at three levels namely,
-	// a) Core specification,
-	// b) industry sector-specific adaptations, and
-	// c) Network-specific adaptations.
-	// Except core, each adaptation (sector or network) should prefix a unique namespace with the allowed value.
-	// Values outside the allowed values may or may not be ignored by the rendering platform.
-	// As this schema is purely for catalog display purposes, it is not recommended to send this value during search.
+// Describes a skill of the person.
+type PersonSkills struct {
 	Code string `json:"code,omitempty"`
-
-	// A human-readable string describing the heading under which the tags are to be displayed.
-	//
-	// Sometimes, the network policy may reserve some names for this property. Values outside the reserved values can be set by the BPP.
-	// However,the BAP may choose to rename or even ignore this value and render the output purely using code property,
-	// but it is recommended for BAPs to keep the name same to avoid confusion and provide consistency.
-	// As this schema is purely for catalog display purposes, it is not recommended to send this value during `search`.
 	Name string `json:"name,omitempty"`
-
-	// An array of Tag objects listed under this group.
-	//
-	// This property can be set by BAPs during search to narrow the `search` and achieve more relevant results.
-	// When received during `on_search`, BAPs must render this list under the heading described by the `name` property of this schema.
-	List []Tag `json:"list,omitempty"`
 }
 
-// Time - Describes time in its various forms. It can be a single point in time; duration; or a structured timetable of operations
-type Time struct {
-	Label string `json:"label,omitempty"`
+// Describes the direct performer, driver or executor that fulfills an order. It is usually a person. But in some rare cases, it could be a non-living entity like a drone, or a bot. Some examples of agents are Doctor in the healthcare sector, a driver in the mobility sector, or a delivery person in the logistics sector. This object can be set at any stage of the order lifecycle. This can be set at the discovery stage when the BPP wants to provide details on the agent fulfilling the order, like in healthcare, where the doctor's name appears during search. This object can also used to search for a particular person that the customer wants fulfilling an order. Sometimes, this object gets instantiated after the order is confirmed, like in the case of on-demand taxis, where the driver is assigned after the user confirms the ride.
+type Agent struct {
+	Person       *Person       `json:"person,omitempty"`
+	Contact      *Contact      `json:"contact,omitempty"`
+	Organization *Organization `json:"organization,omitempty"`
+	Rating       string        `json:"rating,omitempty"`
+}
+type Vehicle struct {
+	Category         string `json:"category,omitempty"`
+	Capacity         int32  `json:"capacity,omitempty"`
+	Make             string `json:"make,omitempty"`
+	Model            string `json:"model,omitempty"`
+	Size             string `json:"size,omitempty"`
+	Variant          string `json:"variant,omitempty"`
+	Color            string `json:"color,omitempty"`
+	EnergyType       string `json:"energy_type,omitempty"`
+	Registration     string `json:"registration,omitempty"`
+	WheelsCount      string `json:"wheels_count,omitempty"`
+	CargoVolumne     string `json:"cargo_volumne,omitempty"`
+	WheelchairAccess string `json:"wheelchair_access,omitempty"`
+	Code             string `json:"code,omitempty"`
+	EmissionStandard string `json:"emission_standard,omitempty"`
+}
 
-	Timestamp time.Time `json:"timestamp,omitempty"`
+// A logical point in space and time during the fulfillment of an order.
+type Stop struct {
+	Id           string `json:"id,omitempty"`
+	ParentStopId string `json:"parent_stop_id,omitempty"`
+	// Location of the stop
+	Location *Location `json:"location,omitempty"`
+	// The type of stop. Allowed values of this property can be defined by the network policy.
+	Type_ string `json:"type,omitempty"`
+	// Timings applicable at the stop.
+	Time *Time `json:"time,omitempty"`
+	// Instructions that need to be followed at the stop
+	Instructions *StopInstructions `json:"instructions,omitempty"`
+	// Contact details of the stop
+	Contact *Contact `json:"contact,omitempty"`
+	// The details of the person present at the stop
+	Person        *Person        `json:"person,omitempty"`
+	Authorization *Authorization `json:"authorization,omitempty"`
+}
 
-	Duration *Duration `json:"duration,omitempty"`
+// Instructions that need to be followed at the stop
+type StopInstructions struct {
+	Name           string                    `json:"name,omitempty"`
+	Code           string                    `json:"code,omitempty"`
+	ShortDesc      string                    `json:"short_desc,omitempty"`
+	LongDesc       string                    `json:"long_desc,omitempty"`
+	AdditionalDesc *DescriptorAdditionalDesc `json:"additional_desc,omitempty"`
+	Media          []MediaFile               `json:"media,omitempty"`
+	Images         []Image                   `json:"images,omitempty"`
+}
 
-	Range *timeRange `json:"range,omitempty"`
+// Describes an authorization mechanism used to start or end the fulfillment of an order. For example, in the mobility sector, the driver may require a one-time password to initiate the ride. In the healthcare sector, a patient may need to provide a password to open a video conference link during a teleconsultation.
+type Authorization struct {
+	// Type of authorization mechanism used. The allowed values for this field can be published as part of the network policy.
+	Type_ string `json:"type,omitempty"`
+	// Token used for authorization. This is typically generated at the BPP. The BAP can send this value to the user via any channel that it uses to authenticate the user like SMS, Email, Push notification, or in-app rendering.
+	Token string `json:"token,omitempty"`
+	// Timestamp in RFC3339 format from which token is valid
+	ValidFrom time.Time `json:"valid_from,omitempty"`
+	// Timestamp in RFC3339 format until which token is valid
+	ValidTo time.Time `json:"valid_to,omitempty"`
+	// Status of the token
+	Status string `json:"status,omitempty"`
+}
 
+// Describes the terms of settlement between the BAP and the BPP for a single transaction. When instantiated, this object contains <ol><li>the amount that has to be settled,</li><li>The payment destination destination details</li><li>When the settlement should happen, and</li><li>A transaction reference ID</li></ol>. During a transaction, the BPP reserves the right to decide the terms of payment. However, the BAP can send its terms to the BPP first. If the BPP does not agree to those terms, it must overwrite the terms and return them to the BAP. If overridden, the BAP must either agree to the terms sent by the BPP in order to preserve the provider's autonomy, or abort the transaction. In case of such disagreements, the BAP and the BPP can perform offline negotiations on the payment terms. Once an agreement is reached, the BAP and BPP can resume transactions.
+type Payment struct {
+	// ID of the payment term that can be referred at an item or an order level in a catalog
+	Id string `json:"id,omitempty"`
+	// This field indicates who is the collector of payment. The BAP can set this value to 'bap' if it wants to collect the payment first and  settle it to the BPP. If the BPP agrees to those terms, the BPP should not send the payment url. Alternatively, the BPP can set this field with the value 'bpp' if it wants the payment to be made directly.
+	CollectedBy string `json:"collected_by,omitempty"`
+	// A payment url to be called by the BAP. If empty, then the payment is to be done offline. The details of payment should be present in the params object. If tl_method = http/get, then the payment details will be sent as url params. Two url param values, ```$transaction_id``` and ```$amount``` are mandatory.
+	Url    string         `json:"url,omitempty"`
+	Params *PaymentParams `json:"params,omitempty"`
+	Type_  string         `json:"type,omitempty"`
+	Status string         `json:"status,omitempty"`
+	Time   *Time          `json:"time,omitempty"`
+	Tags   []TagGroup     `json:"tags,omitempty"`
+}
+type PaymentParams struct {
+	// The reference transaction ID associated with a payment activity
+	TransactionId               string `json:"transaction_id,omitempty"`
+	Amount                      string `json:"amount,omitempty"`
+	Currency                    string `json:"currency,omitempty"`
+	BankCode                    string `json:"bank_code,omitempty"`
+	BankAccountNumber           string `json:"bank_account_number,omitempty"`
+	VirtualPaymentAddress       string `json:"virtual_payment_address,omitempty"`
+	SourceBankCode              string `json:"source_bank_code,omitempty"`
+	SourceBankAccountNumber     string `json:"source_bank_account_number,omitempty"`
+	SourceVirtualPaymentAddress string `json:"source_virtual_payment_address,omitempty"`
+}
+
+// An offer associated with a catalog. This is typically used to promote a particular product and enable more purchases.
+type Offer struct {
+	Id          string      `json:"id,omitempty"`
+	Descriptor  *Descriptor `json:"descriptor,omitempty"`
+	LocationIds []string    `json:"location_ids,omitempty"`
+	CategoryIds []string    `json:"category_ids,omitempty"`
+	ItemIds     []string    `json:"item_ids,omitempty"`
+	Time        *Time       `json:"time,omitempty"`
+	Tags        []TagGroup  `json:"tags,omitempty"`
+}
+
+// Describes a product or a service offered to the end consumer by the provider. In the mobility sector, it can represent a fare product like one way journey. In the logistics sector, it can represent the delivery service offering. In the retail domain it can represent a product like a grocery item.
+type Item struct {
+	// ID of the item.
+	Id string `json:"id,omitempty"`
+	// ID of the item, this item is a variant of
+	ParentItemId string `json:"parent_item_id,omitempty"`
+	// The number of units of the parent item this item is a multiple of
+	ParentItemQuantity *ItemQuantity `json:"parent_item_quantity,omitempty"`
+	// Physical description of the item
+	Descriptor *Descriptor `json:"descriptor,omitempty"`
+	// The creator of this item
+	Creator *ItemCreator `json:"creator,omitempty"`
+	// The price of this item, if it has intrinsic value
+	Price *Price `json:"price,omitempty"`
+	// The selling quantity of the item
+	Quantity *ItemQuantity `json:"quantity,omitempty"`
+	// Categories this item can be listed under
+	CategoryIds []string `json:"category_ids,omitempty"`
+	// Modes through which this item can be fulfilled
+	FulfillmentIds []string `json:"fulfillment_ids,omitempty"`
+	// Provider Locations this item is available in
+	LocationIds []string `json:"location_ids,omitempty"`
+	// Payment modalities through which this item can be ordered
+	PaymentIds []string `json:"payment_ids,omitempty"`
+	AddOns     []AddOn  `json:"add_ons,omitempty"`
+	// Cancellation terms of this item
+	CancellationTerms []CancellationTerm `json:"cancellation_terms,omitempty"`
+	// Refund terms of this item
+	RefundTerms []Terms `json:"refund_terms,omitempty"`
+	// Terms that are applicable be met when this item is replaced
+	ReplacementTerms []Terms `json:"replacement_terms,omitempty"`
+	// Terms that are applicable when this item is returned
+	ReturnTerms []Terms `json:"return_terms,omitempty"`
+	// Additional input required from the customer to purchase / avail this item
+	Xinput *XInput `json:"xinput,omitempty"`
+	// Temporal attributes of this item. This property is used when the item exists on the catalog only for a limited period of time.
+	Time *Time `json:"time,omitempty"`
+	// Whether this item can be rated
+	Rateable bool `json:"rateable,omitempty"`
+	// The rating of the item
+	Rating string `json:"rating,omitempty"`
+	// Whether this item is an exact match of the request
+	Matched bool `json:"matched,omitempty"`
+	// Whether this item is a related item to the exactly matched item
+	Related bool `json:"related,omitempty"`
+	// Whether this item is a recommended item to a response
+	Recommended bool `json:"recommended,omitempty"`
+	// Time to live in seconds for an instance of this schema
+	Ttl  string     `json:"ttl,omitempty"`
+	Tags []TagGroup `json:"tags,omitempty"`
+}
+
+// Refund term of an item or an order
+type Terms struct {
+	// The state of fulfillment during which this term is applicable.
+	FulfillmentState *TermsFulfillmentState `json:"fulfillment_state,omitempty"`
+	// Indicates if cancellation will result in a refund
+	RefundEligible bool `json:"refund_eligible,omitempty"`
+	// Time within which refund will be processed after successful cancellation.
+	RefundWithin *TermsRefundWithin `json:"refund_within,omitempty"`
+	RefundAmount *Price             `json:"refund_amount,omitempty"`
+}
+
+// The state of fulfillment during which this term is applicable.
+type TermsFulfillmentState struct {
+	// Name of the state
+	Name string `json:"name,omitempty"`
+	// State code as per country or international standards
+	Code string `json:"code,omitempty"`
+}
+
+// Time within which refund will be processed after successful cancellation.
+type TermsRefundWithin struct {
+	Label     string     `json:"label,omitempty"`
+	Timestamp time.Time  `json:"timestamp,omitempty"`
+	Duration  string     `json:"duration,omitempty"`
+	Range_    *TimeRange `json:"range,omitempty"`
 	// comma separated values representing days of the week
-	Days string `json:"days,omitempty"`
-
+	Days     string    `json:"days,omitempty"`
 	Schedule *Schedule `json:"schedule,omitempty"`
 }
 
-type timeRange struct {
-	Start string `json:"start,omitempty"`
-
-	End string `json:"end,omitempty"`
+// Describes the cancellation terms of an item or an order. This can be referenced at an item or order level. Item-level cancellation terms can override the terms at the order level.
+type CancellationTerm struct {
+	// The state of fulfillment during which this term is applicable.
+	FulfillmentState *FulfillmentState `json:"fulfillment_state,omitempty"`
+	// Indicates whether a reason is required to cancel the order
+	ReasonRequired bool `json:"reason_required,omitempty"`
+	// Information related to the time of cancellation.
+	CancelBy        *CancelBy  `json:"cancel_by,omitempty"`
+	CancellationFee *Fee       `json:"cancellation_fee,omitempty"`
+	Xinput          *XInput    `json:"xinput,omitempty"`
+	ExternalRef     *MediaFile `json:"external_ref,omitempty"`
 }
 
-// Tracking - Contains tracking information that can be used by the BAP to track the fulfillment of an order in real-time. which is useful for knowing the location of time sensitive deliveries.
-type Tracking struct {
-	// A unique tracking reference number
-	ID string `json:"id,omitempty"`
-
-	// A URL to the tracking endpoint.
-	//
-	// This can be a link to a tracking webpage, a webhook URL created by the BAP where BPP can push the tracking data, or a GET url creaed by the BPP which the BAP can poll to get the tracking data.
-	// It can also be a websocket URL where the BPP can push real-time tracking data.
-	URL string `json:"url,omitempty"`
-
-	// In case there is no real-time tracking endpoint available, this field will contain the latest location of the entity being tracked. The BPP will update this value everytime the BAP calls the track API.
-	Location *struct {
-		Location
-	} `json:"location,omitempty"`
-
-	// This value indicates if the tracking is currently active or not.
-	//
-	// If this value is `active`, then the BAP can begin tracking the order.
-	// If this value is `inactive`, the tracking URL is considered to be expired and the BAP should stop tracking the order.
-	Status *string `json:"status,omitempty" validate:"omitempty,oneof=active inactive"`
-
-	Tags *TagGroup `json:"tags,omitempty"`
-}
-
-// Vehicle - Describes the properties of a vehicle used in a mobility service
-type Vehicle struct {
-	Category string `json:"category,omitempty"`
-
-	Make string `json:"make,omitempty"`
-
-	Model string `json:"model,omitempty"`
-
-	Size string `json:"size,omitempty"`
-
-	Variant string `json:"variant,omitempty"`
-
-	Color string `json:"color,omitempty"`
-
-	EnergyType string `json:"energy_type,omitempty"`
-
-	Registration string `json:"registration,omitempty"`
-}
-
-// XInput - Contains any additional or extended inputs required to confirm an order.
-//
-// This is typically a Form Input. Sometimes, selection of catalog elements is not enough for the BPP to confirm an order.
-// For example, to confirm a flight ticket, the airline requires details of the passengers along with information on baggage, identity, in addition to the class of ticket.
-// Similarly, a logistics company may require details on the nature of shipment in order to confirm the shipping.
-// A recruiting firm may require additional details on the applicant in order to confirm a job application.
-// For all such purposes, the BPP can choose to send this object attached to any object in the catalog that is required to be sent while placing the order.
-// This object can typically be sent at an item level or at the order level.
-// The item level XInput will override the Order level XInput as it indicates a special requirement of information for that particular item.
-// Hence the BAP must render a separate form for the Item and another form at the Order level before confirmation.
+// Contains any additional or extended inputs required to confirm an order. This is typically a Form Input. Sometimes, selection of catalog elements is not enough for the BPP to confirm an order. For example, to confirm a flight ticket, the airline requires details of the passengers along with information on baggage, identity, in addition to the class of ticket. Similarly, a logistics company may require details on the nature of shipment in order to confirm the shipping. A recruiting firm may require additional details on the applicant in order to confirm a job application. For all such purposes, the BPP can choose to send this object attached to any object in the catalog that is required to be sent while placing the order. This object can typically be sent at an item level or at the order level. The item level XInput will override the Order level XInput as it indicates a special requirement of information for that particular item. Hence the BAP must render a separate form for the Item and another form at the Order level before confirmation.
 type XInput struct {
-	Form
+	Head         *XInputHead         `json:"head,omitempty"`
+	Form         *Form               `json:"form,omitempty"`
+	FormResponse *XInputFormResponse `json:"form_response,omitempty"`
+	// Indicates whether the form data is mandatorily required by the BPP to confirm the order.
+	Required bool `json:"required,omitempty"`
 }
 
-// XInputResponse - The response to the form fetched via the XInput URL
-type XInputResponse []XInputResponseInner
+// Describes a form
+type Form struct {
+	// The form identifier.
+	Id string `json:"id,omitempty"`
+	// The URL from where the form can be fetched. The content fetched from the url must be processed as per the mime_type specified in this object. Once fetched, the rendering platform can choosed to render the form as-is as an embeddable element; or process it further to blend with the theme of the application. In case the interface is non-visual, the the render can process the form data and reproduce it as per the standard specified in the form.
+	Url string `json:"url,omitempty"`
+	// The form submission data
+	Data map[string]string `json:"data,omitempty"`
+	// This field indicates the nature and format of the form received by querying the url. MIME types are defined and standardized in IETF's RFC 6838.
+	MimeType            string `json:"mime_type,omitempty"`
+	Resubmit            bool   `json:"resubmit,omitempty"`
+	MultipleSumbissions bool   `json:"multiple_sumbissions,omitempty"`
+}
 
-// XInputResponse - The response to the form fetched via the XInput URL
-type XInputResponseInner struct {
-	// The _name_ attribute of the input tag in the XInput form
-	Input string `json:"input,omitempty"`
+// Describes the response to a form submission
+type XInputFormResponse struct {
+	// Contains the status of form submission.
+	Status       string       `json:"status,omitempty"`
+	Signature    string       `json:"signature,omitempty"`
+	SubmissionId string       `json:"submission_id,omitempty"`
+	Errors       []ModelError `json:"errors,omitempty"`
+}
 
-	// The value of the input field. Files must be sent as data URLs.
-	//
-	// For more information on Data URLs visit https://developer.mozilla.org/en-US/docs/Web/HTTP/Basics_of_HTTP/Data_URLs
+// Describes an error object that is returned by a BAP, BPP or BG as a response or callback to an action by another network participant. This object is sent when any request received by a network participant is unacceptable. This object can be sent either during Ack or with the callback.
+type ModelError struct {
+	// Standard error code. For full list of error codes, refer to docs/protocol-drafts/BECKN-005-ERROR-CODES-DRAFT-01.md of this repo\"
+	Code string `json:"code,omitempty"`
+	// Path to json schema generating the error. Used only during json schema validation errors
+	Paths string `json:"paths,omitempty"`
+	// Human readable message describing the error. Used mainly for logging. Not recommended to be shown to the user.
+	Message string `json:"message,omitempty"`
+}
+
+// Provides the header information for the xinput.
+type XInputHead struct {
+	Descriptor *Descriptor      `json:"descriptor,omitempty"`
+	Index      *XInputHeadIndex `json:"index,omitempty"`
+	Headings   []string         `json:"headings,omitempty"`
+}
+
+type XInputHeadIndex struct {
+	Min int32 `json:"min,omitempty"`
+	Cur int32 `json:"cur,omitempty"`
+	Max int32 `json:"max,omitempty"`
+}
+
+// A fee applied on a particular entity
+type Fee struct {
+	// Percentage of a value
+	Percentage string `json:"percentage,omitempty"`
+	// A fixed value
+	Amount *AllOfFeeAmount `json:"amount,omitempty"`
+}
+
+// A fixed value
+type AllOfFeeAmount struct {
+	Currency       string `json:"currency,omitempty"`
+	Value          string `json:"value,omitempty"`
+	EstimatedValue string `json:"estimated_value,omitempty"`
+	ComputedValue  string `json:"computed_value,omitempty"`
+	ListedValue    string `json:"listed_value,omitempty"`
+	OfferedValue   string `json:"offered_value,omitempty"`
+	MinimumValue   string `json:"minimum_value,omitempty"`
+	MaximumValue   string `json:"maximum_value,omitempty"`
+}
+
+// Information related to the time of cancellation.
+type CancelBy struct {
+	Label     string     `json:"label,omitempty"`
+	Timestamp time.Time  `json:"timestamp,omitempty"`
+	Duration  string     `json:"duration,omitempty"`
+	Range_    *TimeRange `json:"range,omitempty"`
+	// comma separated values representing days of the week
+	Days     string    `json:"days,omitempty"`
+	Schedule *Schedule `json:"schedule,omitempty"`
+}
+
+// Describes an additional item offered as a value-addition to a product or service. This does not exist independently in a catalog and is always associated with an item.
+type AddOn struct {
+	// Provider-defined ID of the add-on
+	Id         string        `json:"id,omitempty"`
+	Descriptor *Descriptor   `json:"descriptor,omitempty"`
+	Price      *Price        `json:"price,omitempty"`
+	Quantity   *ItemQuantity `json:"quantity,omitempty"`
+}
+
+// Describes the price of a product or service
+type Price struct {
+	Currency       string `json:"currency,omitempty"`
+	Value          string `json:"value,omitempty"`
+	EstimatedValue string `json:"estimated_value,omitempty"`
+	ComputedValue  string `json:"computed_value,omitempty"`
+	ListedValue    string `json:"listed_value,omitempty"`
+	OfferedValue   string `json:"offered_value,omitempty"`
+	MinimumValue   string `json:"minimum_value,omitempty"`
+	MaximumValue   string `json:"maximum_value,omitempty"`
+}
+
+// The creator of this item
+type ItemCreator struct {
+	Descriptor *Descriptor `json:"descriptor,omitempty"`
+	// The postal address of the organization
+	Address string `json:"address,omitempty"`
+	// The state where the organization's address is registered
+	State *State `json:"state,omitempty"`
+	// The city where the the organization's address is registered
+	City    *City        `json:"city,omitempty"`
+	Contact *Contact     `json:"contact,omitempty"`
+	Creds   []Credential `json:"creds,omitempty"`
+}
+
+// Describes the count or amount of an item
+type ItemQuantity struct {
+	Allocated *ItemQuantityAllocated `json:"allocated,omitempty"`
+	Available *ItemQuantityAvailable `json:"available,omitempty"`
+	Maximum   *ItemQuantityMaximum   `json:"maximum,omitempty"`
+	Minimum   *ItemQuantityMinimum   `json:"minimum,omitempty"`
+	Selected  *ItemQuantitySelected  `json:"selected,omitempty"`
+	Unitized  *ItemQuantityUnitized  `json:"unitized,omitempty"`
+}
+
+// This represents the exact quantity allocated for purchase of the item.
+type ItemQuantityAllocated struct {
+	Count   int32   `json:"count,omitempty"`
+	Measure *Scalar `json:"measure,omitempty"`
+}
+
+// This represents the exact quantity available for purchase of the item. The buyer can only purchase multiples of this
+type ItemQuantityAvailable struct {
+	Count   int32   `json:"count,omitempty"`
+	Measure *Scalar `json:"measure,omitempty"`
+}
+
+// This represents the maximum quantity allowed for purchase of the item
+type ItemQuantityMaximum struct {
+	Count   int32   `json:"count,omitempty"`
+	Measure *Scalar `json:"measure,omitempty"`
+}
+
+// This represents the quantity selected for purchase of the item
+type ItemQuantitySelected struct {
+	Count   int32   `json:"count,omitempty"`
+	Measure *Scalar `json:"measure,omitempty"`
+}
+
+// This represents the minimum quantity allowed for purchase of the item
+type ItemQuantityMinimum struct {
+	Count   int32   `json:"count,omitempty"`
+	Measure *Scalar `json:"measure,omitempty"`
+}
+
+// This represents the quantity available in a single unit of the item
+type ItemQuantityUnitized struct {
+	Count   int32   `json:"count,omitempty"`
+	Measure *Scalar `json:"measure,omitempty"`
+}
+
+//***********************************************************************************************************************
+// ********************************************* END ON SEARCH API DS  **************************************************
+// ********************************************* START OF ON SELECT DS **************************************************
+
+// Describes a legal purchase order. It contains the complete details of the legal contract created between the buyer and the seller.
+type Order struct {
+	// Human-readable ID of the order. This is generated at the BPP layer. The BPP can either generate order id within its system or forward the order ID created at the provider level.
+	Id string `json:"id,omitempty"`
+	// A list of order IDs to link this order to previous orders.
+	RefOrderIds []string `json:"ref_order_ids,omitempty"`
+	// Status of the order. Allowed values can be defined by the network policy
+	Status string `json:"status,omitempty"`
+	// This is used to indicate the type of order being created to BPPs. Sometimes orders can be linked to previous orders, like a replacement order in a retail domain. A follow-up consultation in healthcare domain. A single order part of a subscription order. The list of order types can be standardized at the network level.
+	Type_ string `json:"type,omitempty"`
+	// Details of the provider whose catalog items have been selected.
+	Provider *Provider `json:"provider,omitempty"`
+	// The items purchased / availed in this order
+	Items []Item `json:"items,omitempty"`
+	// The add-ons purchased / availed in this order
+	AddOns []AddOn `json:"add_ons,omitempty"`
+	// The offers applied in this order
+	Offers []Offer `json:"offers,omitempty"`
+	// The billing details of this order
+	Billing *Billing `json:"billing,omitempty"`
+	// The fulfillments involved in completing this order
+	Fulfillments []Fulfillment `json:"fulfillments,omitempty"`
+	// The cancellation details of this order
+	Cancellation *Cancellation `json:"cancellation,omitempty"`
+	// Cancellation terms of this item
+	CancellationTerms []CancellationTerm `json:"cancellation_terms,omitempty"`
+	Documents         []OrderDocuments   `json:"documents,omitempty"`
+	// Refund terms of this item
+	RefundTerms []Terms `json:"refund_terms,omitempty"`
+	// Replacement terms of this item
+	ReplacementTerms []Terms `json:"replacement_terms,omitempty"`
+	// Return terms of this item
+	ReturnTerms []Terms `json:"return_terms,omitempty"`
+	// The mutually agreed upon quotation for this order.
+	Quote *Quotation `json:"quote,omitempty"`
+	// The terms of settlement for this order
+	Payments []Payment `json:"payments,omitempty"`
+	// The date-time of creation of this order
+	CreatedAt time.Time `json:"created_at,omitempty"`
+	// The date-time of updated of this order
+	UpdatedAt time.Time `json:"updated_at,omitempty"`
+	// Additional input required from the customer to confirm this order
+	Xinput *XInput    `json:"xinput,omitempty"`
+	Tags   []TagGroup `json:"tags,omitempty"`
+}
+
+// Describes a quote. It is the estimated price of products or services from the BPP.<br>This has properties like price, breakup, ttl
+type Quotation struct {
+	// ID of the quote.
+	Id string `json:"id,omitempty"`
+	// The total quoted price
+	Price *Price `json:"price,omitempty"`
+	// the breakup of the total quoted price
+	Breakup []QuotationBreakup `json:"breakup,omitempty"`
+	Ttl     string             `json:"ttl,omitempty"`
+}
+type QuotationBreakup struct {
+	Item  *Item  `json:"item,omitempty"`
+	Title string `json:"title,omitempty"`
+	Price *Price `json:"price,omitempty"`
+}
+
+// Documnents associated to the order
+type OrderDocuments struct {
+	Descriptor *Descriptor `json:"descriptor,omitempty"`
+	// This field indicates the nature and format of the form received by querying the url. MIME types are defined and standardized in IETF's RFC 6838.
+	MimeType string `json:"mime_type,omitempty"`
+	// The URL from where the form can be fetched. The content fetched from the url must be processed as per the mime_type specified in this object.
+	Url string `json:"url,omitempty"`
+	// The URL from where the form can be fetched. The content fetched from the url must be processed as per the mime_type specified in this object.
+	OldPolicyDoc string `json:"old_policy_doc,omitempty"`
+}
+
+// Describes the billing details of an entity.<br>This has properties like name,organization,address,email,phone,time,tax_number, created_at,updated_at
+type Billing struct {
+	// Name of the billable entity
+	Name string `json:"name,omitempty"`
+	// Details of the organization being billed.
+	Organization *Organization `json:"organization,omitempty"`
+	// The address of the billable entity
+	Address string `json:"address,omitempty"`
+	// The state where the billable entity resides. This is important for state-level tax calculation
+	State *State `json:"state,omitempty"`
+	// The city where the billable entity resides.
+	City *City `json:"city,omitempty"`
+	// Email address where the bill is sent to
+	Email string `json:"email,omitempty"`
+	// Phone number of the billable entity
+	Phone string `json:"phone,omitempty"`
+	// Details regarding the billing period
+	Time *Time `json:"time,omitempty"`
+	// ID of the billable entity as recognized by the taxation authority
+	TaxId string `json:"tax_id,omitempty"`
+}
+
+// Describes a cancellation event
+type Cancellation struct {
+	// Date-time when the order was cancelled by the buyer
+	Time        time.Time `json:"time,omitempty"`
+	CancelledBy string    `json:"cancelled_by,omitempty"`
+	// The reason for cancellation
+	Reason *CancellationReason `json:"reason,omitempty"`
+	// Any additional information regarding the nature of cancellation
+	AdditionalDescription *CancellationAdditionalDescription `json:"additional_description,omitempty"`
+}
+
+// The reason for cancellation
+type CancellationReason struct {
+	Id         string      `json:"id,omitempty"`
+	Descriptor *Descriptor `json:"descriptor,omitempty"`
+}
+type CancellationAdditionalDescription struct {
+	Name           string                    `json:"name,omitempty"`
+	Code           string                    `json:"code,omitempty"`
+	ShortDesc      string                    `json:"short_desc,omitempty"`
+	LongDesc       string                    `json:"long_desc,omitempty"`
+	AdditionalDesc *DescriptorAdditionalDesc `json:"additional_desc,omitempty"`
+	Media          []MediaFile               `json:"media,omitempty"`
+	Images         []Image                   `json:"images,omitempty"`
+}
+
+// ***********************************************************************************************************************
+// ********************************************* END ON ON-SELECT API DS  ***********************************************
+// ********************************************* START OF RATING  DS *************************************************
+// Describes the rating of an entity
+type Rating struct {
+	// Category of the entity being rated
+	RatingCategory string `json:"rating_category,omitempty"`
+	// Id of the object being rated
+	Id string `json:"id,omitempty"`
+	// Rating value given to the object. This can be a single value or can also contain an inequality operator like gt, gte, lt, lte. This can also contain an inequality expression containing logical operators like && and ||.
 	Value string `json:"value,omitempty"`
 }
 
-// Domain - Codification of domain for ONDC
-type Domain struct {
-	Value string `validate:"oneof=nic2004:52110 ONDC:RET10 ONDC:RET11 ONDC:RET12 ONDC:RET13 ONDC:RET14 ONDC:RET15 ONDC:RET16 ONDC:RET17 ONDC:RET18 ONDC:RET19 ONDC:FIS14"`
+// ***********************************************************************************************************************
+// ********************************************* END ON RATING API DS  ***********************************************
+// ********************************************* START OF BAP  DS *************************************************
+
+// Describes the products or services offered by a BPP. This is typically sent as the response to a search intent from a BAP. The payment terms, offers and terms of fulfillment supported by the BPP can also be included here. The BPP can show hierarchical nature of products/services in its catalog using the parent_category_id in categories. The BPP can also send a ttl (time to live) in the context which is the duration for which a BAP can cache the catalog and use the cached catalog.  <br>This has properties like bbp/descriptor,bbp/categories,bbp/fulfillments,bbp/payments,bbp/offers,bbp/providers and exp<br>This is used in the following situations.<br><ul><li>This is typically used in the discovery stage when the BPP sends the details of the products and services it offers as response to a search intent from the BAP. </li></ul>
+type Catalog struct {
+	Descriptor *Descriptor `json:"descriptor,omitempty"`
+	// Fulfillment modes offered at the BPP level. This is used when a BPP itself offers fulfillments on behalf of the providers it has onboarded.
+	Fulfillments []Fulfillment `json:"fulfillments,omitempty"`
+	// Payment terms offered by the BPP for all transactions. This can be overriden at the provider level.
+	Payments []Payment `json:"payments,omitempty"`
+	// Offers at the BPP-level. This is common across all providers onboarded by the BPP.
+	Offers    []Offer    `json:"offers,omitempty"`
+	Providers []Provider `json:"providers,omitempty"`
+	// Timestamp after which catalog will expire
+	Exp time.Time `json:"exp,omitempty"`
+	// Duration in seconds after which this catalog will expire
+	Ttl  string     `json:"ttl,omitempty"`
+	Tags []TagGroup `json:"tags,omitempty"`
 }
 
-// UnmarshalJSON unmarshal underlying value
-func (d *Domain) UnmarshalJSON(b []byte) error { return json.Unmarshal(b, &d.Value) }
-
-// MarshalJSON marshal underlying value
-func (d *Domain) MarshalJSON() ([]byte, error) { return json.Marshal(d.Value) }
-
-// DecimalValue - Describes a decimal value
-type DecimalValue struct {
-	Value string `validate:"custom_decimal_value"`
+// Contains tracking information that can be used by the BAP to track the fulfillment of an order in real-time. which is useful for knowing the location of time sensitive deliveries.
+type Tracking struct {
+	// A unique tracking reference number
+	Id string `json:"id,omitempty"`
+	// A URL to the tracking endpoint. This can be a link to a tracking webpage, a webhook URL created by the BAP where BPP can push the tracking data, or a GET url creaed by the BPP which the BAP can poll to get the tracking data. It can also be a websocket URL where the BPP can push real-time tracking data.
+	Url string `json:"url,omitempty"`
+	// In case there is no real-time tracking endpoint available, this field will contain the latest location of the entity being tracked. The BPP will update this value everytime the BAP calls the track API.
+	Location *Location `json:"location,omitempty"`
+	// This value indicates if the tracking is currently active or not. If this value is `active`, then the BAP can begin tracking the order. If this value is `inactive`, the tracking URL is considered to be expired and the BAP should stop tracking the order.
+	Status string `json:"status,omitempty"`
+}
+type OnRatingBody struct {
+	Context *Context         `json:"context"`
+	Message *OnRatingMessage `json:"message"`
+	Error_  *ModelError      `json:"error,omitempty"`
 }
 
-// UnmarshalJSON unmarshal underlying value
-func (d *DecimalValue) UnmarshalJSON(b []byte) error { return json.Unmarshal(b, &d.Value) }
-
-// MarshalJSON marshal underlying value
-func (d *DecimalValue) MarshalJSON() ([]byte, error) { return json.Marshal(d.Value) }
-
-// Duration - Describes duration as per ISO8601 format
-type Duration struct {
-	Value string
+type OnRatingMessage struct {
+	// A feedback form to allow the user to provide additional information on the rating provided
+	FeedbackForm *MessageFeedbackForm `json:"feedback_form,omitempty"`
 }
 
-// UnmarshalJSON unmarshal underlying value
-func (d *Duration) UnmarshalJSON(b []byte) error { return json.Unmarshal(b, &d.Value) }
-
-// MarshalJSON marshal underlying value
-func (d *Duration) MarshalJSON() ([]byte, error) { return json.Marshal(d.Value) }
-
-// FeedbackForm - Describes a feedback form that a Seller App can send to get feedback from the Buyer App
-type FeedbackForm []FeedbackFormElement
-
-// GPS - Describes a gps coordinate
-type GPS struct {
-	Value string `validate:"custom_gps"`
+// A feedback form to allow the user to provide additional information on the rating provided
+type MessageFeedbackForm struct {
+	Head         *XInputHead         `json:"head,omitempty"`
+	Form         *Form               `json:"form,omitempty"`
+	FormResponse *XInputFormResponse `json:"form_response,omitempty"`
+	// Indicates whether the form data is mandatorily required by the BPP to confirm the order.
+	Required bool `json:"required,omitempty"`
 }
 
-// UnmarshalJSON unmarshal underlying value
-func (g *GPS) UnmarshalJSON(b []byte) error { return json.Unmarshal(b, &g.Value) }
+// ***********************************************************************************************************************
+// ********************************************* END of BAP API DS  ***********************************************
+// *********************************************  DS used in code   *************************************************
 
-// MarshalJSON marshal underlying value
-func (g *GPS) MarshalJSON() ([]byte, error) { return json.Marshal(g.Value) }
-
-// Image - Image of an object
-//
-// A url based image will look like
-// `uri:http://path/to/image`
-// image can also be sent as a data string. For example :
-// `data:js87y34ilhriuho84r3i4`
-type Image struct {
-	Value string
+// Describes the acknowledgement sent in response to an API call. If the implementation uses HTTP/S, then Ack must be returned in the same session. Every API call to a BPP must be responded to with an Ack whether the BPP intends to respond with a callback or not. This has one property called `status` that indicates the status of the Acknowledgement.
+type Ack struct {
+	// The status of the acknowledgement. If the request passes the validation criteria of the BPP, then this is set to ACK. If a BPP responds with status = `ACK` to a request, it is required to respond with a callback. If the request fails the validation criteria, then this is set to NACK. Additionally, if a BPP does not intend to respond with a callback even after the request meets the validation criteria, it should set this value to `NACK`.
+	Status string `json:"status,omitempty"`
+	// A list of tags containing any additional information sent along with the Acknowledgement.
+	Tags []TagGroup `json:"tags,omitempty"`
 }
-
-// UnmarshalJSON unmarshal underlying value
-func (i *Image) UnmarshalJSON(b []byte) error { return json.Unmarshal(b, &i.Value) }
-
-// MarshalJSON marshal underlying value
-func (i *Image) MarshalJSON() ([]byte, error) { return json.Marshal(i.Value) }
-
-// Name - Describes the name of a person in format: ./{given_name}/{honorific_prefix}/{first_name}/{middle_name}/{last_name}/{honorific_suffix}
-type Name struct {
-	Value string `validate:"custom_name"`
-}
-
-// UnmarshalJSON unmarshal underlying value
-func (n *Name) UnmarshalJSON(b []byte) error { return json.Unmarshal(b, &n.Value) }
-
-// MarshalJSON marshal underlying value
-func (n *Name) MarshalJSON() ([]byte, error) { return json.Marshal(n.Value) }
-
-// Rateable - If the entity can be rated or not
-type Rateable struct {
-	Value bool
-}
-
-// UnmarshalJSON unmarshal underlying value
-func (r *Rateable) UnmarshalJSON(b []byte) error { return json.Unmarshal(b, &r.Value) }
-
-// MarshalJSON marshal underlying value
-func (r *Rateable) MarshalJSON() ([]byte, error) { return json.Marshal(r.Value) }

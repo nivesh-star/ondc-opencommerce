@@ -27,7 +27,7 @@ type GenericCallbackRequest struct {
 type OnSearchRequest struct {
 	Context *Context         `json:"context" validate:"required"`
 	Message *OnSearchMessage `json:"message,omitempty"`
-	Error   *Error           `json:"error,omitempty"`
+	Error   *ModelError      `json:"error,omitempty"`
 }
 
 // OnSearchMessage is an inner message of OnSearchRequest.
@@ -39,7 +39,7 @@ type OnSearchMessage struct {
 type OnSelectRequest struct {
 	Context *Context         `json:"context" validate:"required"`
 	Message *OnSelectMessage `json:"message,omitempty"`
-	Error   *Error           `json:"error,omitempty"`
+	Error   *ModelError      `json:"error,omitempty"`
 }
 
 // OnSelectMessage is an inner message of OnSelectRequest.
@@ -51,7 +51,7 @@ type OnSelectMessage struct {
 type OnInitRequest struct {
 	Context *Context       `json:"context" validate:"required"`
 	Message *OnInitMessage `json:"message,omitempty"`
-	Error   *Error         `json:"error,omitempty"`
+	Error   *ModelError    `json:"error,omitempty"`
 }
 
 // OnInitMessage is an inner message of OnInitRequest.
@@ -63,7 +63,7 @@ type OnInitMessage struct {
 type OnConfirmRequest struct {
 	Context *Context          `json:"context" validate:"required"`
 	Message *OnConfirmMessage `json:"message,omitempty"`
-	Error   *Error            `json:"error,omitempty"`
+	Error   *ModelError       `json:"error,omitempty"`
 }
 
 // OnConfirmMessage is an inner message of OnConfirmRequest.
@@ -75,7 +75,7 @@ type OnConfirmMessage struct {
 type OnTrackRequest struct {
 	Context *Context        `json:"context" validate:"required"`
 	Message *OnTrackMessage `json:"message,omitempty"`
-	Error   *Error          `json:"error,omitempty"`
+	Error   *ModelError     `json:"error,omitempty"`
 }
 
 // OnTrackMessage is an inner message of OnTrackRequest.
@@ -87,7 +87,7 @@ type OnTrackMessage struct {
 type OnCancelRequest struct {
 	Context *Context         `json:"context" validate:"required"`
 	Message *OnCancelMessage `json:"message,omitempty"`
-	Error   *Error           `json:"error,omitempty"`
+	Error   *ModelError      `json:"error,omitempty"`
 }
 
 // OnCancelMessage is an inner message of OnCancelRequest.
@@ -99,7 +99,7 @@ type OnCancelMessage struct {
 type OnUpdateRequest struct {
 	Context *Context         `json:"context" validate:"required"`
 	Message *OnUpdateMessage `json:"message,omitempty"`
-	Error   *Error           `json:"error,omitempty"`
+	Error   *ModelError      `json:"error,omitempty"`
 }
 
 // OnUpdateMessage is an inner message of OnUpdateRequest.
@@ -111,7 +111,7 @@ type OnUpdateMessage struct {
 type OnStatusRequest struct {
 	Context *Context         `json:"context" validate:"required"`
 	Message *OnStatusMessage `json:"message,omitempty"`
-	Error   *Error           `json:"error,omitempty"`
+	Error   *ModelError      `json:"error,omitempty"`
 }
 
 // OnStatusMessage is an inner message of OnStatusRequest.
@@ -121,16 +121,16 @@ type OnStatusMessage struct {
 
 // OnRatingRequest contains an on_rating Catalog for products and services.
 type OnRatingRequest struct {
-	Context *Context   `json:"context" validate:"required"`
-	Message *ratingAck `json:"message,omitempty"`
-	Error   *Error     `json:"error,omitempty"`
+	Context *Context         `json:"context" validate:"required"`
+	Message *OnRatingMessage `json:"message,omitempty"`
+	Error   *ModelError      `json:"error,omitempty"`
 }
 
 // OnSupportRequest contains an on_support Catalog for products and services.
 type OnSupportRequest struct {
 	Context *Context          `json:"context" validate:"required"`
 	Message *OnSupportMessage `json:"message,omitempty"`
-	Error   *Error            `json:"error,omitempty"`
+	Error   *ModelError       `json:"error,omitempty"`
 }
 
 // OnSupportMessage is an inner message of OnSupportRequest.

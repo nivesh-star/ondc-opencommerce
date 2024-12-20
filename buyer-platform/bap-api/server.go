@@ -242,6 +242,7 @@ func genericHandler[R model.BAPRequest](s *server, action string, w http.Respons
 		return
 	}
 
+	fmt.Println("dump:", string(body))
 	var payload R
 	if err := decodeAndValidate(body, &payload); err != nil {
 		log.Errorf("Request body is invalid: %v", err)

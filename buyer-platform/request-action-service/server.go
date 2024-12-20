@@ -221,12 +221,12 @@ func (s *server) handleSubscription(w http.ResponseWriter, r *http.Request) {
 		if messageData.Action == "search" {
 			url = s.conf.GatewayURL
 		} else {
-			url = originalReq.Context.BppURI
+			url = originalReq.Context.BppUri
 		}
 
 		// Replace BAP data so that the callback is sended to our BAP API Service
-		*originalReq.Context.BapID = s.conf.SubscriberID
-		*originalReq.Context.BapURI = s.conf.SubscriberURL
+		*&originalReq.Context.BppId = s.conf.SubscriberID
+		*&originalReq.Context.BapUri = s.conf.SubscriberURL
 		adjustedReqJSON, err := json.Marshal(originalReq)
 		if err != nil {
 			log.Errorf("Marshal adjusted request failed: %v", err)

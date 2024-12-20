@@ -182,12 +182,17 @@ func decodeAndValidate(body []byte, payload any) error {
 
 // ackResponse returns an appropriate status code and response body for valid request body.
 func ackResponse(w http.ResponseWriter) {
-	res := model.AckResponse{
-		Message: &model.MessageAck{
-			Ack: &model.Ack{
-				Status: "ACK",
-			},
-		},
+	// res := model.AckResponse{
+	// 	Message: &model.MessageAck{
+	// 		Ack: &model.Ack{
+	// 			Status: "ACK",
+	// 		},
+	// 	},
+	// }
+
+	res := model.Ack{
+		Status: "ACK",
+		Tags:   nil,
 	}
 
 	resJSON, err := json.Marshal(res)
@@ -211,15 +216,33 @@ func nackResponse(w http.ResponseWriter) {
 	}
 	errCodeStr := strconv.Itoa(errCode)
 
-	res := model.AckResponse{
-		Message: &model.MessageAck{
-			Ack: &model.Ack{
-				Status: "NACK",
+	// res := model.AckResponse{
+	// 	Message: &model.MessageAck{
+	// 		Ack: &model.Ack{
+	// 			Status: "NACK",
+	// 		},
+	// 	},
+	// 	Error: &model.Error{
+	// 		Type: "JSON-SCHEMA-ERROR",
+	// 		Code: &errCodeStr,
+	// 	},
+	// }
+	res := model.Ack{
+		Status: "NACK",
+		Tags: []model.TagGroup{
+			{
+				Display: false,
+				List: []model.Tag{
+					{
+						Display: true,
+						Value:   "JSON-SCHEMA-ERROR",
+					},
+					{
+						Display: true,
+						Value:   errCodeStr,
+					},
+				},
 			},
-		},
-		Error: &model.Error{
-			Type: "JSON-SCHEMA-ERROR",
-			Code: &errCodeStr,
 		},
 	}
 
