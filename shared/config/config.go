@@ -111,14 +111,14 @@ type MockGatewayConfig struct {
 
 // BAPAPIConfig is a config for BAP API service.
 type BAPAPIConfig struct {
-	SubscriberID    string `json:"subscriberID" validate:"required"`
-	ProjectID       string `json:"projectID" validate:"required"`
-	TopicID         string `json:"topicID" validate:"required"`
-	Port            int    `json:"port" validate:"required"`
-	RegistryURL     string `json:"registryURL" validate:"required,url"`
-	InstanceID      string `json:"instanceID" validate:"required"`
-	DatabaseID      string `json:"databaseID" validate:"required"`
-	ONDCEnvironment string `json:"ONDCEnvironment"`
+	SubscriberID string `json:"subscriberID" validate:"required"`
+	ProjectID    string `json:"projectID" validate:"required"`
+	TopicID      string `json:"topicID" validate:"required"`
+	Port         int    `json:"port" validate:"required"`
+	RegistryURL  string `json:"registryURL" validate:"required,url"`
+	// InstanceID      string `json:"instanceID" validate:"required"`
+	// DatabaseID      string `json:"databaseID" validate:"required"`
+	// ONDCEnvironment string `json:"ONDCEnvironment"`
 }
 
 // RequestActionConfig is a config for Request Action Service.

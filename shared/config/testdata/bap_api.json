@@ -1,5 +1,7 @@
 {
+    "subscriberID" : "app.mfapis.in",
     "projectID": "test-project",
     "topicID": "test-topic",
-    "port": 8000
+    "port": 8090,
+    "registryURL": "https://dummy-registry-url"
 }

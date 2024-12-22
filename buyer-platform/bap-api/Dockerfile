@@ -7,14 +7,14 @@ COPY ./go.sum /app
 # RUN go mod tidy
 # Copy source files
 COPY ./shared /app/shared
-COPY ./buyer-platform/request-action-service /app/request-action-service
+COPY ./buyer-platform/bap-api /app/bap-api
 # Download dependencies and build the binary
-RUN  GOARCH=amd64 GOOS=linux go build -o app-request-action-service request-action-service/server.go
+RUN  GOARCH=amd64 GOOS=linux go build -o app-bap-api bap-api/server.go
 
 # Final stage
 FROM alpine:3.17
 WORKDIR /app
-COPY --from=builder /app/app-request-action-service /app/
+COPY --from=builder /app/app-bap-api /app/
 COPY --from=builder /app/shared/config/testdata/* /app/
 RUN ls -alh /app
-CMD ["./app-request-action-service"]
+CMD ["./app-bap-api"]

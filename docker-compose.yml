@@ -21,6 +21,44 @@ services:
       - AWS_ENDPOINT=http://localstack:4566  # LocalStack endpoint using container name
     ports:
       - "8080:8080"  # Exposing app port (adjust as needed)
+  
+  request-action-service:  # Create a topic
+    image: request-action-service  # Replace with the actual image name for your app
+    container_name: request-action-service
+    depends_on:
+      - localstack  # Ensure localstack is ready before the app starts
+      - buyer-app-service
+    networks:
+      - localstack-network
+    environment:
+      - AWS_ENDPOINT=http://localstack:4566  # LocalStack endpoint using container name
+    ports:
+      - "8081:8081"  # Exposing app port (adjust as needed)
+
+  bap-api:
+    image: bap-api  # Replace with the actual image name for your app
+    container_name: bap-api
+    depends_on:
+      - localstack  # Ensure localstack is ready before the app starts
+    networks:
+      - localstack-network
+    environment:
+      - AWS_ENDPOINT=http://localstack:4566  # LocalStack endpoint using container name
+    ports:
+      - "8090:8090"  # Exposing app port (adjust as needed)
+  
+  bap-adapter-service:
+    image: bap-adapter-service  # Replace with the actual image name for your app
+    container_name: bap-adapter-service
+    depends_on:
+      - localstack # Ensure localstack is ready before the app starts
+    networks:
+      - localstack-network
+    environment:
+      - AWS_ENDPOINT=http://localstack:4566  # LocalStack endpoint using container name
+      - BUYER_APP_URL="https://eong8y8k4phkbn0.m.pipedream.net"
+    ports:
+      - "8091:8091"  # Exposing app port (adjust as needed)
 
 networks:
   localstack-network:

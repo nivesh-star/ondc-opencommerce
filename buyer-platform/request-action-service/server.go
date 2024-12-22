@@ -88,7 +88,7 @@ func main() {
 	// 	log.Exit("CONFIG env is not set")
 	// }
 
-	conf, err := config.Read[config.RequestActionConfig]("/Users/sandeep.sharma/workspace/nivesh/ondc-opencommerce/shared/config/testdata/callback_action.json")
+	conf, err := config.Read[config.RequestActionConfig]("./callback_action.json")
 	if err != nil {
 		log.Exit(err)
 	}
@@ -121,17 +121,24 @@ func initServer(ctx context.Context, conf config.RequestActionConfig, clk clock.
 	}
 
 	//TODO: Remove
+
+	time.Sleep(time.Second * 5) //bluddy depend_on tag doesnt resolve this. lets hack this for the time being
+	out, err := pubsubClient.Subscribe(ctx, &sns.SubscribeInput{
+		Protocol: aws.String("http"),
+		TopicArn: aws.String(conf.SubscriptionID[0]),
+		Endpoint: aws.String("http://localhost:8081"),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to subscribe to topic", err)
+	}
+	log.Info("created subscription %v", out.SubscriptionArn)
+
 	keybytes, _ := base64.StdEncoding.DecodeString(SigningPrivateKey)
 	err = keyClient.AddKey(ctx, "signingKey", keybytes)
 	if err != nil {
 		log.Fatal("failed to create signing key in aws secretes manager", err)
+		return nil, fmt.Errorf("failed to create signing key in aws secretes manager", err)
 	}
-
-	pubsubClient.Subscribe(ctx, &sns.SubscribeInput{
-		Protocol: aws.String("http"),
-		TopicArn: aws.String(conf.SubscriptionID[0]),
-		Endpoint: aws.String("http://cea5-2405-201-4012-867-2d4c-99f6-c9dd-c239.ngrok-free.app/sns"),
-	})
 	// transactionClient, err := transactionclient.New(ctx, conf.ProjectID, conf.InstanceID, conf.DatabaseID, transportOpts...)
 	// if err != nil {
 	// 	return nil, fmt.Errorf("init server: %s", err)

@@ -3,6 +3,7 @@ package keyclient
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
@@ -23,14 +24,14 @@ func NewAwsClient(ctx context.Context, projectID, secretID string) (*AWSSecretMa
 
 	cfg, err := config.LoadDefaultConfig(ctx,
 		config.WithRegion("us-east-1"),
-		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider("dummy", "dummy", "dummy")),
+		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider("test", "test", "test")),
 	)
 	if err != nil {
 		log.Fatal("Could not get config %v", err)
 	}
 	//resolver := localstack.NewSecretsManagerResolverV2(l)
 	cli := sm.NewFromConfig(cfg, func(o *sm.Options) {
-		o.BaseEndpoint = aws.String("http://localhost:4566")
+		o.BaseEndpoint = aws.String(os.Getenv("AWS_ENDPOINT"))
 	})
 	client := &AWSSecretManagerKeyClient{
 		secretClient: cli,

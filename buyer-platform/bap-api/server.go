@@ -24,7 +24,6 @@ import (
 	"io"
 	"net/http"
 	"strconv"
-	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 	"github.com/aws/aws-sdk-go/aws"
@@ -60,7 +59,7 @@ func main() {
 	// 	log.Exit("CONFIG env is not set")
 	// }
 
-	conf, err := config.Read[config.BAPAPIConfig]("shared/config/testdata/bap_api.json")
+	conf, err := config.Read[config.BAPAPIConfig]("./bap_api.json")
 	if err != nil {
 		log.Exit(err)
 	}
@@ -161,17 +160,31 @@ func decodeAndValidate(body []byte, payload any) error {
 
 // nackResponse returns an appropriate status code and response body for invalid request body.
 func nackResponse(w http.ResponseWriter, errType, errCode string) {
-	res := model.AckResponse{
-		Message: &model.MessageAck{
-			Ack: &model.Ack{
-				Status: "NACK",
+
+	res := model.Ack{
+		Status: "NACK",
+		Tags: []model.TagGroup{
+			{
+				Display: true,
+				Descriptor: &model.TagDescriptor{
+					Name: errType,
+					Code: errCode,
+				},
 			},
 		},
-		Error: &model.Error{
-			Type: errType,
-			Code: &errCode,
-		},
 	}
+
+	// res := model.AckResponse{
+	// 	Message: &model.MessageAck{
+	// 		Ack: &model.Ack{
+	// 			Status: "NACK",
+	// 		},
+	// 	},
+	// 	Error: &model.Error{
+	// 		Type: errType,
+	// 		Code: &errCode,
+	// 	},
+	// }
 
 	resJSON, err := json.Marshal(res)
 	if err != nil {
@@ -186,12 +199,16 @@ func nackResponse(w http.ResponseWriter, errType, errCode string) {
 
 // ackResponse returns an appropriate status code and response body for valid request body.
 func ackResponse(w http.ResponseWriter) {
-	res := model.AckResponse{
-		Message: &model.MessageAck{
-			Ack: &model.Ack{
-				Status: "ACK",
-			},
-		},
+	// res := model.AckResponse{
+	// 	Message: &model.MessageAck{
+	// 		Ack: &model.Ack{
+	// 			Status: "ACK",
+	// 		},
+	// 	},
+	// }
+	res := model.Ack{
+		Status: "NACK",
+		Tags:   nil,
 	}
 
 	resJSON, err := json.Marshal(res)
@@ -281,25 +298,25 @@ func genericHandler[R model.BAPRequest](s *server, action string, w http.Respons
 	w.Header().Set(psMsgIDHeader, msgID)
 
 	ackResponse(w)
-	log.Infof("Successfully ack request: TransactionID: %q, MessageID: %q", *payload.GetContext().TransactionID, *payload.GetContext().MessageID)
+	log.Infof("Successfully ack request: MessageID: %q", payload.GetContext().MessageId)
 }
 
-func (s *server) storeTransaction(ctx context.Context, action, status string, payload any, msgContext model.Context, errType, errCode, errMsg string) error {
-	transactionData := transactionclient.TransactionData{
-		ID:              *msgContext.TransactionID,
-		Type:            "CALLBACK-ACTION",
-		API:             action,
-		MessageID:       *msgContext.MessageID,
-		Payload:         payload,
-		ProviderID:      msgContext.BppID,
-		MessageStatus:   status,
-		ErrorCode:       errCode,
-		ErrorType:       errType,
-		ErrorMessage:    errMsg,
-		ReqReceivedTime: time.Now(),
-	}
-	return s.transactionClient.StoreTransaction(ctx, transactionData)
-}
+// func (s *server) storeTransaction(ctx context.Context, action, status string, payload any, msgContext model.Context, errType, errCode, errMsg string) error {
+// 	transactionData := transactionclient.TransactionData{
+// 		ID:              *msgContext.TransactionID,
+// 		Type:            "CALLBACK-ACTION",
+// 		API:             action,
+// 		MessageID:       *msgContext.MessageID,
+// 		Payload:         payload,
+// 		ProviderID:      msgContext.BppID,
+// 		MessageStatus:   status,
+// 		ErrorCode:       errCode,
+// 		ErrorType:       errType,
+// 		ErrorMessage:    errMsg,
+// 		ReqReceivedTime: time.Now(),
+// 	}
+// 	return s.transactionClient.StoreTransaction(ctx, transactionData)
+// }
 
 func (s *server) onSearchHandler(w http.ResponseWriter, r *http.Request) {
 	genericHandler[model.OnSearchRequest](s, "on_search", w, r)

@@ -2,18 +2,19 @@
 FROM golang:1.23 as builder
 WORKDIR /app
 
+COPY ./go.mod /app
+COPY ./go.sum /app
+# RUN go mod tidy
 # Copy source files
-COPY ./bap-adapter-service /app/bap-adapter-service
 COPY ./shared /app/shared
-
-# Set the working directory for package `a`
-WORKDIR /app/bap-adapter-service
-
+COPY ./buyer-platform/bap-adapter-service /app/bap-adapter-service
 # Download dependencies and build the binary
-RUN go mod tidy && go build -o bap-adapter-service .
+RUN  GOARCH=amd64 GOOS=linux go build -o app-bap-adapter-service bap-adapter-service/server.go
 
 # Final stage
 FROM alpine:3.17
-WORKDIR /root/
-COPY --from=builder /app/bap-adapter-service/bap-adapter-service .
-CMD ["./bap-adapter-service"]
+WORKDIR /app
+COPY --from=builder /app/app-bap-adapter-service /app/
+COPY --from=builder /app/shared/config/testdata/* /app/
+RUN ls -alh /app
+CMD ["./app-bap-adapter-service"]

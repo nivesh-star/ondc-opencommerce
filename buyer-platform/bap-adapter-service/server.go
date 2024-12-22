@@ -18,21 +18,20 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
-	"fmt"
 	"io"
 	"net/http"
 	"os"
 
-	"cloud.google.com/go/pubsub"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 	log "github.com/golang/glog"
-	"golang.org/x/sync/errgroup"
 
 	localstackclient "partner-innovation.googlesource.com/googleondcaccelerator.git/shared/clients/localstack-aws-client"
 	"partner-innovation.googlesource.com/googleondcaccelerator.git/shared/config"
+	"partner-innovation.googlesource.com/googleondcaccelerator.git/shared/models/model"
 )
 
 type server struct {
@@ -46,12 +45,12 @@ func main() {
 	flag.Set("alsologtostderr", "true")
 	ctx := context.Background()
 
-	configPath, ok := os.LookupEnv("CONFIG")
-	if !ok {
-		log.Exit("CONFIG env is not set")
-	}
+	// configPath, ok := os.LookupEnv("CONFIG")
+	// if !ok {
+	// 	log.Exit("CONFIG env is not set")
+	// }
 
-	conf, err := config.Read[config.BuyerAdapterConfig](configPath)
+	conf, err := config.Read[config.BuyerAdapterConfig]("./bap_adapter_config.json")
 	if err != nil {
 		log.Exit(err)
 	}
@@ -67,9 +66,7 @@ func main() {
 	}
 	log.Info("Server initialization successs")
 
-	if err := srv.serve(ctx); err != nil {
-		log.Exitf("Serving failed: %v", err)
-	}
+	srv.serve(ctx)
 }
 
 func subscriptionExists(client *sns.Client, topicArn string) (bool, error) {
@@ -110,17 +107,23 @@ func initServer(ctx context.Context, httpClient *http.Client, pubsubClient *sns.
 
 	//validate the subscriptions
 	subs := make([]string, 0, len(conf.SubscriptionID))
-	for _, subID := range conf.SubscriptionID {
-		exist, err := subscriptionExists(pubsubClient, subID)
-		if err != nil {
-			return nil, fmt.Errorf("init server: failed in checking if the subscription %q exists: %v", subID, err)
-		}
-		if !exist {
-			return nil, fmt.Errorf("init server: subscription %q does not exist", subID)
-		}
+	// for _, subID := range conf.SubscriptionID {
+	// 	exist, err := subscriptionExists(pubsubClient, subID)
+	// 	if err != nil {
+	// 		return nil, fmt.Errorf("init server: failed in checking if the subscription %q exists: %v", subID, err)
+	// 	}
+	// 	if !exist {
+	// 		return nil, fmt.Errorf("init server: subscription %q does not exist", subID)
+	// 	}
 
-		subs = append(subs, subID)
-	}
+	// 	subs = append(subs, subID)
+	// }
+
+	pubsubClient.Subscribe(ctx, &sns.SubscribeInput{
+		Protocol: aws.String("http"),
+		TopicArn: aws.String(conf.SubscriptionID[0]),
+		Endpoint: aws.String("http://localhost:8091"),
+	})
 
 	server := &server{
 		pubsubClient: pubsubClient,
@@ -132,43 +135,73 @@ func initServer(ctx context.Context, httpClient *http.Client, pubsubClient *sns.
 }
 
 // serve handles multiple Pub/Sub subscriptions in parallel.
-func (s *server) serve(ctx context.Context) error {
-	g, ctx := errgroup.WithContext(ctx)
+// func (s *server) serve(ctx context.Context) error {
+// 	g, ctx := errgroup.WithContext(ctx)
 
-	for _, sub := range s.subs {
-		// create a subscription as a local variable
-		// so that it can be passed to handleSubscription safely.
-		sub := sub
-		g.Go(func() error {
-			return s.handleSubscription(ctx, sub)
-		})
+// 	for _, sub := range s.subs {
+// 		// create a subscription as a local variable
+// 		// so that it can be passed to handleSubscription safely.
+// 		sub := sub
+// 		g.Go(func() error {
+// 			return s.handleSubscription(ctx, sub)
+// 		})
+// 	}
+
+// 	log.Info("Ready to receive messages")
+// 	return g.Wait()
+// }
+
+func (s *server) serve(ctx context.Context) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/sns", s.handleSubscription)
+	if err := http.ListenAndServe("0.0.0.0:8091", mux); err != nil {
+		log.Fatalf("failed to start HTTP server, %v", err)
 	}
+}
 
-	log.Info("Ready to receive messages")
-	return g.Wait()
+type Notification struct {
+	Type             string `json:"Type"`
+	MessageId        string `json:"MessageId"`
+	TopicArn         string `json:"TopicArn"`
+	Message          string `json:"Message"`
+	Timestamp        string `json:"Timestamp"`
+	SubscribeURL     string `json:"SubscribeURL,omitempty"`
+	UnsubscribeURL   string `json:"UnsubscribeURL,omitempty"`
+	SignatureVersion string `json:"SignatureVersion"`
+	Signature        string `json:"Signature"`
+	SigningCertURL   string `json:"SigningCertURL"`
+}
+type MessageData struct {
+	Action string `json:"action,omitempty"`
+	Data   string `json:"data,omitempty"`
 }
 
 // handleSubscription receives and handles messages from the Pub/Sub subscription.
-func (s *server) handleSubscription(ctx context.Context, sub pubsub.Message) error {
-	err := sub.Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
-		defer func() {
-			// Ack the msg irrespective of whether the message was successfully processed or not
-			// since we do not want the msg to be retried.
-			msg.Ack()
-			log.Infof("Handling of message %q ends", msg.ID)
-		}()
+func (s *server) handleSubscription(w http.ResponseWriter, r *http.Request) {
 
-		log.Infof("Receiving a message from %q, message ID: %q", sub.ID(), msg.ID)
+	payload := Notification{}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		http.Error(w, "Invalid message", http.StatusBadRequest)
+		return
+	}
 
-		// example actions: `on_search`, `on_select`
-		action, ok := msg.Attributes["action"]
-		if !ok {
-			log.Error(`"action" attribute is not present in the message`)
+	log.Info("Received: ", payload.Type, "MessageId: ", payload.MessageId)
+
+	messageData := MessageData{}
+	if payload.Type == "Notification" {
+		if err := json.Unmarshal([]byte(payload.Message), &messageData); err != nil {
+			log.Fatalf("Failed to unmarshal nested message: %v", err)
+		}
+
+		var originalReq model.GenericRequest
+		if err := json.Unmarshal([]byte(messageData.Data), &originalReq); err != nil {
+			log.Errorf("Unmarshal request failed: %v", err)
 			return
 		}
 
-		buyerEndpoint := s.config.BuyerAppURL + "/" + action
-		response, err := s.httpClient.Post(buyerEndpoint, "application/json", bytes.NewReader(msg.Data))
+		//buyerEndpoint := s.config.BuyerAppURL + "/" + messageData.Action
+		buyerEndpoint := os.Getenv("BUYER_APP_URL") + "/" + messageData.Action //for the time being take app url from docker compose.
+		response, err := s.httpClient.Post(buyerEndpoint, "application/json", bytes.NewReader([]byte(payload.Message)))
 		if err != nil {
 			log.Errorf("Calling Buyer App failed: %v", err)
 			return
@@ -187,8 +220,19 @@ func (s *server) handleSubscription(ctx context.Context, sub pubsub.Message) err
 		}
 
 		log.Info("Handle the message successfully")
-		msg.Ack()
-	})
-
-	return err
+		w.WriteHeader(http.StatusOK)
+	} else {
+		request, err := http.NewRequest(http.MethodGet, payload.SubscribeURL, nil)
+		if err != nil {
+			log.Error("failed to confirm topic subscription", err.Error())
+			return
+		}
+		// send a request to ONDC network
+		_, err = s.httpClient.Do(request)
+		if err != nil {
+			log.Errorf("Sending request to ONDC network failed: %v", err)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}
 }
