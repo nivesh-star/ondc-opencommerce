@@ -9,7 +9,9 @@ COPY ./go.sum /app
 COPY ./shared /app/shared
 COPY ./buyer-platform/buyer-app-service /app/buyer-app-service
 # Download dependencies and build the binary
-RUN GOARCH=amd64 GOOS=linux go build -o app-buyer-app-service buyer-app-service/server.go
+ARG TARGETOS
+ARG TARGETARCH
+RUN  CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o app-buyer-app-service buyer-app-service/server.go
 
 # Final stage
 FROM alpine:3.17

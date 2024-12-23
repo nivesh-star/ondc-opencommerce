@@ -9,7 +9,9 @@ COPY ./go.sum /app
 COPY ./shared /app/shared
 COPY ./buyer-platform/request-action-service /app/request-action-service
 # Download dependencies and build the binary
-RUN  GOARCH=amd64 GOOS=linux go build -o app-request-action-service request-action-service/server.go
+ARG TARGETOS
+ARG TARGETARCH
+RUN  CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o app-request-action-service request-action-service/server.go
 
 # Final stage
 FROM alpine:3.17
