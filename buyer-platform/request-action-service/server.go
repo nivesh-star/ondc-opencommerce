@@ -18,7 +18,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -132,12 +131,12 @@ func initServer(ctx context.Context, conf config.RequestActionConfig, clk clock.
 	// }
 	// log.Info("created subscription %v", out.SubscriptionArn)
 
-	keybytes, _ := base64.StdEncoding.DecodeString(SigningPrivateKey)
-	err = keyClient.AddKey(ctx, "signingKey", keybytes)
-	if err != nil {
-		log.Fatal("failed to create signing key in aws secretes manager", err)
-		return nil, fmt.Errorf("failed to create signing key in aws secretes manager", err)
-	}
+	// keybytes, _ := base64.StdEncoding.DecodeString(SigningPrivateKey)
+	// err = keyClient.AddKey(ctx, "signingKey", keybytes)
+	// if err != nil {
+	// 	log.Fatal("failed to create signing key in aws secretes manager", err)
+	// 	return nil, fmt.Errorf("failed to create signing key in aws secretes manager", err)
+	// }
 
 	// transactionClient, err := transactionclient.New(ctx, conf.ProjectID, conf.InstanceID, conf.DatabaseID, transportOpts...)
 	// if err != nil {
