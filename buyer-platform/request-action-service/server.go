@@ -26,7 +26,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 	"github.com/benbjohnson/clock"
 	log "github.com/golang/glog"
@@ -122,16 +121,16 @@ func initServer(ctx context.Context, conf config.RequestActionConfig, clk clock.
 
 	//TODO: Remove
 
-	time.Sleep(time.Second * 5) //bluddy depend_on tag doesnt resolve this. lets hack this for the time being
-	out, err := pubsubClient.Subscribe(ctx, &sns.SubscribeInput{
-		Protocol: aws.String("http"),
-		TopicArn: aws.String(conf.SubscriptionID[0]),
-		Endpoint: aws.String("http://localhost:8081"),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to subscribe to topic", err)
-	}
-	log.Info("created subscription %v", out.SubscriptionArn)
+	// time.Sleep(time.Second * 5) //bluddy depend_on tag doesnt resolve this. lets hack this for the time being
+	// out, err := pubsubClient.Subscribe(ctx, &sns.SubscribeInput{
+	// 	Protocol: aws.String("http"),
+	// 	TopicArn: aws.String(conf.SubscriptionID[0]),
+	// 	Endpoint: aws.String("http://localhost:8081/sns"),
+	// })
+	// if err != nil {
+	// 	return nil, fmt.Errorf("failed to subscribe to topic", err)
+	// }
+	// log.Info("created subscription %v", out.SubscriptionArn)
 
 	keybytes, _ := base64.StdEncoding.DecodeString(SigningPrivateKey)
 	err = keyClient.AddKey(ctx, "signingKey", keybytes)
@@ -139,6 +138,7 @@ func initServer(ctx context.Context, conf config.RequestActionConfig, clk clock.
 		log.Fatal("failed to create signing key in aws secretes manager", err)
 		return nil, fmt.Errorf("failed to create signing key in aws secretes manager", err)
 	}
+
 	// transactionClient, err := transactionclient.New(ctx, conf.ProjectID, conf.InstanceID, conf.DatabaseID, transportOpts...)
 	// if err != nil {
 	// 	return nil, fmt.Errorf("init server: %s", err)

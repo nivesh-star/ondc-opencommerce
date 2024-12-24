@@ -119,11 +119,11 @@ func initServer(ctx context.Context, httpClient *http.Client, pubsubClient *sns.
 	// 	subs = append(subs, subID)
 	// }
 
-	pubsubClient.Subscribe(ctx, &sns.SubscribeInput{
-		Protocol: aws.String("http"),
-		TopicArn: aws.String(conf.SubscriptionID[0]),
-		Endpoint: aws.String("http://localhost:8091"),
-	})
+	// pubsubClient.Subscribe(ctx, &sns.SubscribeInput{
+	// 	Protocol: aws.String("http"),
+	// 	TopicArn: aws.String(conf.SubscriptionID[0]),
+	// 	Endpoint: aws.String("http://localhost:8091"),
+	// })
 
 	server := &server{
 		pubsubClient: pubsubClient,
