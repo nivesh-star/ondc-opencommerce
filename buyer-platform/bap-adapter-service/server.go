@@ -229,10 +229,6 @@ func (s *server) handleSubscription(w http.ResponseWriter, r *http.Request) {
 		}
 		// send a request to ONDC network
 		_, err = s.httpClient.Do(request)
-		if err != nil {
-			log.Errorf("Sending request to ONDC network failed: %v", err)
-			return
-		}
 		w.WriteHeader(http.StatusOK)
 	}
 }
